@@ -2,7 +2,7 @@
 // Created by Jonathan on 26-Sep-25.
 //
 
-#include "../include/imgur.h"
+#include <imgur.h>
 #include <curl/curl.h>
 #include <string>
 #include <nlohmann/json.hpp>
@@ -18,20 +18,20 @@ using namespace Windows::Storage;
 
 using json = nlohmann::json;
 
-ImgurAPI::ImgurAPI(const string apikey) {
+ImgurAPI::ImgurAPI(const string &apikey) {
     clientID = apikey;
 }
 
 ImgurAPI::~ImgurAPI() {
 }
 
-string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) {
+string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) const {
     auto stream = streamRef.OpenReadAsync().get();
     uint64_t size = stream.Size();
     vector<uint8_t> imageData(static_cast<size_t>(size));
 
     DataReader reader(stream);
-    reader.LoadAsync(static_cast<uint32_t>(size)).get();
+    (void) reader.LoadAsync(static_cast<uint32_t>(size)).get();
     reader.ReadBytes(array_view<uint8_t>(imageData));
     reader.Close();
 
@@ -73,8 +73,6 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) {
             return j["data"]["link"];
         }
 
-        return "default";
-    } catch (const json::exception &e) {
         return "default";
     } catch (...) {
         return "default";

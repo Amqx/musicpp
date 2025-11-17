@@ -17,28 +17,28 @@ set(DISCORD_SDK_INCLUDE_DIR "${DISCORD_SDK_ROOT}/include")
 set(DISCORD_LIB_PATH "${DISCORD_SDK_LIB_DIR}/discord_partner_sdk.lib")
 set(DISCORD_SHARED_LIB "${DISCORD_SDK_BIN_DIR}/discord_partner_sdk.dll")
 
-include_directories(.)
+include_directories(./include)
+include_directories(discordsdk)
+
+set(RESOURCE_FILE resource.rc)
 
 add_definitions(-D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 
 add_executable(musicpp
         src/main.cpp
         src/mediaPlayer.cpp
-        include/mediaPlayer.h
         src/spotify.cpp
-        include/spotify.h
         src/imgur.cpp
-        include/imgur.h
         src/discordrp.cpp
-        include/discordrp.h
         src/credhelper.cpp
-        include/credhelper.h
         src/discordpp_impl.cpp
+        ${RESOURCE_FILE}
 )
 set_target_properties(musicpp PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 
 target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} Advapi32 leveldb::leveldb Shell32)
 target_include_directories(musicpp PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
+target_compile_definitions(musicpp PRIVATE UNICODE _UNICODE)
 
 # Copy Social SDK shared library to output directory, so it's available at runtime.
 add_custom_command(TARGET musicpp POST_BUILD

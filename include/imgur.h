@@ -15,7 +15,7 @@ using namespace Windows::Storage::Streams;
 
 class ImgurAPI {
 public:
-    ImgurAPI(const string apikey);
+    ImgurAPI(const string &apikey);
 
     ~ImgurAPI();
 
@@ -23,7 +23,7 @@ public:
 
     ImgurAPI &operator=(const ImgurAPI &) = delete;
 
-    string uploadImage(IRandomAccessStreamReference const &streamRef);
+    string uploadImage(IRandomAccessStreamReference const &streamRef) const;
 
 private:
     string clientID;

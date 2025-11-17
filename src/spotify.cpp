@@ -4,7 +4,7 @@
 
 #include <Windows.h>
 
-#include "include/spotify.h"
+#include <spotify.h>
 #include <iostream>
 #include <sstream>
 #include <chrono>
@@ -13,7 +13,7 @@
 #include <algorithm>
 #include <cctype>
 #include <nlohmann/json.hpp>
-#include <include/credhelper.h>
+#include <credhelper.h>
 
 using namespace std::chrono;
 
@@ -29,7 +29,7 @@ string SpotifyAPI::convertWString(const wstring &wstr) {
         return "";
     }
 
-    int required_size = WideCharToMultiByte(
+    const int required_size = WideCharToMultiByte(
         CP_UTF8, // CodePage: Convert to UTF-8
         0, // dwFlags
         wstr.data(), // lpWideCharStr: Pointer to wide string data
@@ -62,10 +62,10 @@ bool SpotifyAPI::requestToken() {
     if (!spotify_client_token.empty()) {
         auto split = spotify_client_token.find(L'|');
         if (split != string::npos) {
-            auto timestamp = stoi(spotify_client_token.substr(split + 1));
-            auto currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+            const auto timestamp = stoi(spotify_client_token.substr(split + 1));
 
-            if (currTime - timestamp < 3600) {
+            if (auto currTime = duration_cast<seconds>(system_clock::now().time_since_epoch()).count();
+                currTime - timestamp < 3600) {
                 accessToken = convertWString(spotify_client_token.substr(0, split));
                 lastRefreshTime = currTime - timestamp;
                 return true;
@@ -78,7 +78,7 @@ bool SpotifyAPI::requestToken() {
     CURL *curl = curl_easy_init();
     if (!curl) return false;
 
-    string auth = clientId + ":" + clientSecret;
+    const string auth = clientId + ":" + clientSecret;
 
     struct curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
@@ -114,7 +114,11 @@ bool SpotifyAPI::requestToken() {
 
 void SpotifyAPI::refreshLoop() {
     while (running) {
-        this_thread::sleep_for(chrono::seconds(3600 - lastRefreshTime));
+        // counts till 1 hour 100ms at a time
+        for (int i = 0; i < 36000; i++) {
+            if (!running) return;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
         if (!requestToken()) {
             cerr << "Failed to refresh token.\n";
         }
@@ -138,7 +142,6 @@ SpotifyAPI::SpotifyAPI(const string &apikey, const string &apisecret) {
     if (!requestToken()) {
         throw runtime_error("Failed to obtain initial access token");
     }
-    wcout << L"Spotify access token acquired!" << endl;
     running = true;
     refreshThread = thread(&SpotifyAPI::refreshLoop, this);
 }
@@ -290,9 +293,6 @@ string SpotifyAPI::getAlbumImageUrl(const string &jsonString, const string &inpu
             }
         }
 
-        return "failed";
-    } catch (const json::exception &e) {
-        // JSON parsing error
         return "failed";
     } catch (...) {
         // Any other error

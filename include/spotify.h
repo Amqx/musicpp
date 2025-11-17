@@ -57,6 +57,6 @@ private:
 
     static double calculateSimilarity(const string &str1, const string &str2);
 
-    string convertWString(const wstring &wstr);
+    static string convertWString(const wstring &wstr);
 };
 #endif //MUSICPP_SPOTIFY_H

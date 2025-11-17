@@ -2,7 +2,7 @@
 // Created by Jonathan on 26-Sep-25.
 //
 
-#include "include/discordrp.h"
+#include <discordrp.h>
 #include <iostream>
 
 discordrp::discordrp(mediaPlayer *player, const uint64_t apikey) {
@@ -10,14 +10,13 @@ discordrp::discordrp(mediaPlayer *player, const uint64_t apikey) {
     this->clientID = apikey;
     running = true;
     this->refreshThread = thread(&discordrp::refreshLoop, this);
-    client->AddLogCallback([](auto message, auto severity) {
-        std::cout << "[" << EnumToString(severity) << "] " << message << std::endl;
-    }, discordpp::LoggingSeverity::Info);
     client->SetApplicationId(clientID);
+    client->Connect();
 }
 
-void discordrp::refreshLoop() {
+void discordrp::refreshLoop() const {
     while (running) {
+        discordpp::RunCallbacks();
         this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
@@ -57,16 +56,20 @@ string discordrp::convertWString(const wstring &wstr) {
 
 discordrp::~discordrp() {
     running = false;
+    client->Disconnect();
     if (refreshThread.joinable()) refreshThread.join();
 }
 
-void discordrp::update() {
-    if (appleMusic->getTitle() != L"" && appleMusic->getArtist() != L"" && appleMusic->getAlbum() != L"") {
+void discordrp::update() const {
+    if (!appleMusic->getTitle().empty() && !appleMusic->getArtist().empty() && !appleMusic->getAlbum().empty()) {
         discordpp::Activity activity;
         activity.SetType(discordpp::ActivityTypes::Listening);
         activity.SetName(convertWString(appleMusic->getArtist()));
         activity.SetDetails(convertWString(appleMusic->getTitle())); // title
         activity.SetState(convertWString(appleMusic->getArtist())); // artist
+
+        // enable listening to:
+        activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::State);
 
         if (appleMusic->getState()) {
             discordpp::ActivityTimestamps timestamps;
@@ -92,7 +95,9 @@ void discordrp::update() {
         }
 
         client->UpdateRichPresence(activity, [](const discordpp::ClientResult &result) {
-            if (result.Successful()) {
+            if (!result.Successful()) {
+                cerr << "Discord RPC update failed (" << static_cast<int>(result.Type())
+                        << "): " << result.Error() << endl;
             }
         });
     } else {

@@ -2,11 +2,28 @@
 // Created by Jonathan on 11-Oct-25.
 //
 
-#include "../include/credhelper.h"
-#include <wincred.h>
+#include <credhelper.h>
 #include <iostream>
+#include <wincred.h>
 #include <string>
 #include <vector>
+
+std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &friendlyName,
+                              const std::wstring &helpUrl, bool forceReset) {
+    std::wstring value = ReadGenericCredential(keyPath);
+
+    if (value.empty() || forceReset) {
+        std::wcout << L"\n" << friendlyName << L" not set! Please get one here: " << helpUrl << std::endl;
+        std::wcout << L"Enter your " << friendlyName << L":" << std::endl;
+
+        std::wstring newValue;
+        std::wcin >> newValue;
+
+        WriteGenericCredential(keyPath, newValue);
+        return newValue;
+    }
+    return value;
+}
 
 inline void CheckError(BOOL result, const std::wstring &task) {
     if (!result) {
@@ -28,7 +45,7 @@ void WriteGenericCredential(const std::wstring &targetName, const std::wstring &
     cred.CredentialBlob = const_cast<LPBYTE>(secretBlob.data());
     cred.CredentialBlobSize = static_cast<DWORD>(secretBlob.size());
     cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
-    BOOL success = CredWriteW(&cred, 0);
+    const BOOL success = CredWriteW(&cred, 0);
 
     CheckError(success, L"write credential");
 }

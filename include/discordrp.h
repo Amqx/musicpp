@@ -6,8 +6,8 @@
 #define MUSICPP_DISCORDRP_H
 
 #include <string>
-#include <discordsdk/include/discordpp.h>
-#include <include/mediaPlayer.h>
+#include <discordpp.h>
+#include <mediaPlayer.h>
 #include <atomic>
 #include <thread>
 
@@ -23,7 +23,7 @@ public:
 
     discordrp &operator=(const discordrp &) = delete;
 
-    void update();
+    void update() const;
 
 private:
     atomic<bool> running{false};
@@ -32,9 +32,9 @@ private:
     mediaPlayer *appleMusic;
     shared_ptr<discordpp::Client> client = std::make_shared<discordpp::Client>();
 
-    void refreshLoop();
+    void refreshLoop() const;
 
-    string convertWString(const wstring &wstr);
+    static string convertWString(const wstring &wstr);
 };
 
 

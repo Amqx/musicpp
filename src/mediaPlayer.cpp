@@ -2,14 +2,25 @@
 // Created by Jonathan on 25-Sep-25.
 //
 
-#include "../include/mediaPlayer.h"
+#include <mediaPlayer.h>
 #include <iostream>
 #include <fcntl.h>
-#include <include/spotify.h>
+#include <spotify.h>
 #include <utility>
-#include "leveldb/db.h"
+#include <leveldb/db.h>
+#include <limits>
 
 namespace {
+    constexpr uint64_t INVALID_TIME = std::numeric_limits<uint64_t>::max();
+
+    uint64_t unix_seconds_now() {
+        return static_cast<uint64_t>(
+            chrono::duration_cast<chrono::seconds>(
+                chrono::system_clock::now().time_since_epoch()
+            ).count()
+        );
+    }
+
     bool is_extended_whitespace(wchar_t ch) {
         if (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\f' || ch == L'\v') {
             return true;
@@ -88,7 +99,7 @@ namespace {
 mediaPlayer::mediaPlayer(SpotifyAPI *sapi, ImgurAPI *iapi, leveldb::DB *database) {
     this->spotify_client = sapi;
     this->imgur_client = iapi;
-    this -> db = database;
+    this->db = database;
 
     init_apartment();
     if (smtcsm != nullptr) {
@@ -158,6 +169,12 @@ void mediaPlayer::getInfo() {
         auto albumTitle = properties.AlbumTitle();
         auto trackArtist = properties.Artist();
 
+        // if any two are empty we can assume nothing is playing
+        if (albumArtistValue.empty() || properties.Title().empty()) {
+            reset();
+            return;
+        }
+
         this->title = properties.Title().c_str();
 
         if (!albumTitle.empty()) {
@@ -199,6 +216,7 @@ void mediaPlayer::getInfo() {
             refresh = true;
         }
         if (refresh) {
+            this->image_source = L"";
             string stitle = convertWString(title);
             string sartist = convertWString(artist);
             string salbum = convertWString(album);
@@ -210,40 +228,72 @@ void mediaPlayer::getInfo() {
                 leveldb::Status status = db->Get(leveldb::ReadOptions(), songKey, &result);
                 if (!status.ok()) {
                     this->image = L"failed";
+                    this->image_source = L"failed";
                 } else {
-                    size_t sep = result.find('|');
-                    time_t timestamp = stoll(result.substr(0, sep));
-                    string url = result.substr(sep + 1);
-
-                    if (currTime - timestamp > 24 * 7 * 60 * 60) {
-                        db->Delete(leveldb::WriteOptions(), songKey);
+                    size_t firstSep = result.find('|');
+                    time_t timestamp = 0;
+                    string url;
+                    string source;
+                    if (firstSep == string::npos) {
                         this->image = L"failed";
+                        this->image_source = L"failed";
                     } else {
-                        this->image = wstring(url.begin(), url.end());
+                        timestamp = stoll(result.substr(0, firstSep));
+                        size_t secondSep = result.find('|', firstSep + 1);
+                        if (secondSep == string::npos) {
+                            url = result.substr(firstSep + 1);
+                        } else {
+                            url = result.substr(firstSep + 1, secondSep - firstSep - 1);
+                            source = result.substr(secondSep + 1);
+                        }
+                    }
+
+                    if (!url.empty()) {
+                        if (currTime - timestamp > 24 * 7 * 60 * 60) {
+                            db->Delete(leveldb::WriteOptions(), songKey);
+                            this->image = L"failed";
+                            this->image_source = L"DB, expired";
+                        } else {
+                            this->image = wstring(url.begin(), url.end());
+                            if (source.empty()) {
+                                this->image_source = L"DB, cached";
+                            } else {
+                                wstring wsource(source.begin(), source.end());
+                                this->image_source = L"DB, cached from " + wsource;
+                            }
+                        }
                     }
                 }
             }
 
             // Spotify search
-            if ((this->image == L"failed" || this->image == L"") && this->spotify_client != nullptr) {
+            if ((this->image == L"failed" || this->image.empty()) && this->spotify_client != nullptr) {
                 string tn = this->spotify_client->searchTracks(stitle, sartist, salbum);
                 if (tn != "failed" && !tn.empty()) {
-                    string value = to_string(currTime) + "|" + tn;
-                    if (db) db->Put(leveldb::WriteOptions(), songKey, value);
+                    string value = to_string(currTime) + "|" + tn + "|Spotify";
+                    if (db) {
+                        leveldb::Status putstat = db->Put(leveldb::WriteOptions(), songKey, value);
+                    }
                 }
                 this->image = wstring(tn.begin(), tn.end());
+                this->image_source = L"Spotify";
             }
-            if ((this->image == L"failed" || this->image == L"") && imgur_client != nullptr) {
-                // imgur upload, if failed returns "default"
+
+            // imgur upload, if failed returns "default"
+            if ((this->image == L"failed" || this->image.empty()) && imgur_client != nullptr) {
                 auto thumb = properties.Thumbnail();
                 string tn = this->imgur_client->uploadImage(thumb);
                 if (tn != "default" && !tn.empty()) {
-                    string value = to_string(currTime) + "|" + tn;
-                    if (db) db->Put(leveldb::WriteOptions(), songKey, value);
+                    string value = to_string(currTime) + "|" + tn + "|Imgur";
+                    if (db) {
+                        db->Put(leveldb::WriteOptions(), songKey, value);
+                    }
                 }
                 this->image = wstring(tn.begin(), tn.end());
+                this->image_source = L"Imgur";
             }
-            if (this->image == L"") {
+
+            if (this->image.empty()) {
                 this->image = L"default";
             }
         }
@@ -260,6 +310,9 @@ void mediaPlayer::printInfo() const {
     wcout << L"Artist: " << artist << endl;
     wcout << L"Album: " << album << endl;
     wcout << L"Image url: " << image << endl;
+    wcout << L"Image source: " << image_source << endl;
+    wcout << L"Spotify link: " << spotify_link << endl;
+    wcout << L"Itunes link: " << itunes_link << endl;
     wcout << L"Start timestamp (UNIX): " << start_ts << endl;
     wcout << L"End timestamp (UNIX): " << end_ts << endl;
     wcout << L"Currently playing: " << playing << endl;
@@ -286,6 +339,13 @@ wstring mediaPlayer::getImage() {
     return L"default";
 }
 
+wstring mediaPlayer::getImageSource() {
+    if (this->image_source.empty()) {
+        return L"unknown";
+    }
+    return this->image_source;
+}
+
 bool mediaPlayer::getState() const {
     return this->playing;
 }
@@ -302,17 +362,49 @@ uint64_t mediaPlayer::getPauseTimer() const {
     return this->pauseTime;
 }
 
+uint64_t mediaPlayer::getDurationSeconds() const {
+    if (this->start_ts == INVALID_TIME || this->end_ts == INVALID_TIME || this->end_ts <= this->start_ts) {
+        return 0;
+    }
+    return this->end_ts - this->start_ts;
+}
+
+uint64_t mediaPlayer::getElapsedSeconds() const {
+    if (this->start_ts == INVALID_TIME) {
+        return 0;
+    }
+
+    uint64_t referenceTime;
+    if (this->playing) {
+        referenceTime = unix_seconds_now();
+    } else if (this->pauseTime != INVALID_TIME) {
+        referenceTime = this->pauseTime;
+    } else {
+        referenceTime = unix_seconds_now();
+    }
+
+    if (referenceTime <= this->start_ts) {
+        return 0;
+    }
+
+    uint64_t elapsed = referenceTime - this->start_ts;
+    uint64_t duration = getDurationSeconds();
+    if (duration > 0 && elapsed > duration) {
+        elapsed = duration;
+    }
+    return elapsed;
+}
+
 void mediaPlayer::pause() {
     this->playing = false;
-    if (this->pauseTime == -1) {
-        this->pauseTime = chrono::duration_cast<chrono::seconds>(chrono::system_clock::now().time_since_epoch()).
-                count();
+    if (this->pauseTime == INVALID_TIME) {
+        this->pauseTime = unix_seconds_now();
     }
 }
 
 void mediaPlayer::play() {
     this->playing = true;
-    this->pauseTime = -1;
+    this->pauseTime = INVALID_TIME;
 }
 
 void mediaPlayer::reset() {
@@ -320,8 +412,12 @@ void mediaPlayer::reset() {
     this->artist = L"";
     this->album = L"";
     this->image = L"";
-    this->start_ts = -1;
-    this->end_ts = -1;
+    this->image_source = L"";
+    this->spotify_link = L"";
+    this->itunes_link = L"";
+    this->start_ts = INVALID_TIME;
+    this->end_ts = INVALID_TIME;
+    this->pauseTime = INVALID_TIME;
     this->playing = false;
 }
 
@@ -330,7 +426,7 @@ string mediaPlayer::convertWString(const wstring &wstr) {
         return "";
     }
 
-    int required_size = WideCharToMultiByte(
+    const int required_size = WideCharToMultiByte(
         CP_UTF8, // CodePage: Convert to UTF-8
         0, // dwFlags
         wstr.data(), // lpWideCharStr: Pointer to wide string data

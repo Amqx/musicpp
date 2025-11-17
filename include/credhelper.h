@@ -18,4 +18,7 @@ void DeleteGenericCredential(const std::wstring &targetName);
 
 std::string wstr_to_str(const wchar_t *wstr);
 
+std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &friendlyName,
+                              const std::wstring &helpUrl, bool forceReset);
+
 #endif //MUSICPP_CREDHELPER_H
