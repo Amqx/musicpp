@@ -9,6 +9,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/windows.foundation.collections.h>
+#include <utils.h>
 
 using namespace Windows;
 using namespace std;
@@ -18,11 +19,15 @@ using namespace Windows::Storage;
 
 using json = nlohmann::json;
 
-ImgurAPI::ImgurAPI(const string &apikey) {
+ImgurAPI::ImgurAPI(const string &apikey, spdlog::logger *logger) {
     clientID = apikey;
+    this -> logger = logger;
 }
 
 ImgurAPI::~ImgurAPI() {
+    if (logger) {
+        logger -> info("ImgurAPI Killed");
+    }
 }
 
 string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) const {
@@ -30,13 +35,22 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
     uint64_t size = stream.Size();
     vector<uint8_t> imageData(static_cast<size_t>(size));
 
+    if (logger) {
+        logger -> info("Performing Imgur upload with size: {} bytes", size);
+    }
+
     DataReader reader(stream);
     (void) reader.LoadAsync(static_cast<uint32_t>(size)).get();
     reader.ReadBytes(array_view<uint8_t>(imageData));
     reader.Close();
 
     CURL *curl = curl_easy_init();
-    if (!curl) return "default";
+    if (!curl) {
+        if (logger) {
+            logger -> warn("Failed to initialize CURL for Imgur upload.");
+        }
+        return "default";
+    }
 
     string url = "https://api.imgur.com/3/image";
     string readBuffer;
@@ -63,6 +77,9 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
+        if (logger) {
+            logger -> warn("Failed to upload image to Imgur: {}", curl_easy_strerror(res));
+        }
         return "default";
     }
 
@@ -70,16 +87,29 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
         json j = json::parse(readBuffer);
 
         if (j["success"] == true) {
+            if (!j["data"].contains("link") || !j["data"]["link"].is_string()) {
+                if (logger) {
+                    logger->warn("Imgur response missing 'link' field.");
+                }
+                return "default";
+            }
             return j["data"]["link"];
         }
 
+        if (logger) {
+            logger -> warn("Imgur upload failed, success flag false.");
+        }
+
         return "default";
-    } catch (...) {
+    } catch (json::parse_error &e) {
+        if (logger) {
+            logger -> warn("JSON parse error in Imgur uploadImage: {}", e.what());
+        }
+        return "default";
+    } catch (exception &e) {
+        if (logger) {
+            logger -> warn("Other error in Imgur uploadImage: {}", e.what());
+        }
         return "default";
     }
-}
-
-size_t ImgurAPI::WriteCallback(void *contents, size_t size, size_t nmemb, void *userp) {
-    static_cast<string *>(userp)->append(static_cast<char *>(contents), size * nmemb);
-    return size * nmemb;
 }

@@ -9,12 +9,13 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <spdlog/spdlog.h>
 
 using namespace std;
 
 class SpotifyAPI {
 public:
-    SpotifyAPI(const string &apikey, const string &apisecret);
+    SpotifyAPI(const string &apikey, const string &apisecret, spdlog::logger *logger = nullptr);
 
     ~SpotifyAPI();
 
@@ -30,6 +31,7 @@ public:
                         const string &album = "");
 
 private:
+    spdlog::logger* logger;
     string clientId;
     string clientSecret;
     string accessToken;
@@ -38,25 +40,13 @@ private:
     mutex tokenMutex;
     uint64_t lastRefreshTime;
 
-    static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
-
     bool requestToken();
 
     void refreshLoop();
 
-    static string urlEncode(const string &value);
-
-    static string toLowerCase(const string &str);
-
-    static int levenshteinDistance(const string &s1, const string &s2);
-
-    static string getAlbumImageUrl(const string &jsonString,
+    string getAlbumImageUrl(const string &jsonString,
                                    const string &inputTitle,
                                    const string &inputArtist,
-                                   const string &inputAlbum);
-
-    static double calculateSimilarity(const string &str1, const string &str2);
-
-    static string convertWString(const wstring &wstr);
+                                   const string &inputAlbum) const;
 };
 #endif //MUSICPP_SPOTIFY_H

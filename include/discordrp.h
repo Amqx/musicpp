@@ -5,17 +5,17 @@
 #ifndef MUSICPP_DISCORDRP_H
 #define MUSICPP_DISCORDRP_H
 
-#include <string>
 #include <discordpp.h>
 #include <mediaPlayer.h>
 #include <atomic>
 #include <thread>
+#include <spdlog/spdlog.h>
 
 using namespace std;
 
 class discordrp {
 public:
-    discordrp(mediaPlayer *player, const uint64_t apikey);
+    discordrp(mediaPlayer *player, const uint64_t apikey, spdlog::logger* logger = nullptr);
 
     ~discordrp();
 
@@ -26,6 +26,7 @@ public:
     void update() const;
 
 private:
+    spdlog::logger* logger;
     atomic<bool> running{false};
     thread refreshThread;
     uint64_t clientID;
@@ -33,8 +34,6 @@ private:
     shared_ptr<discordpp::Client> client = std::make_shared<discordpp::Client>();
 
     void refreshLoop() const;
-
-    static string convertWString(const wstring &wstr);
 };
 
 

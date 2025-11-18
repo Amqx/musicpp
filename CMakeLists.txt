@@ -9,6 +9,7 @@ find_package(CURL CONFIG REQUIRED)
 find_package(cppwinrt CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(leveldb CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 set(DISCORD_SDK_ROOT "${CMAKE_SOURCE_DIR}/discordsdk")
 set(DISCORD_SDK_LIB_DIR "${DISCORD_SDK_ROOT}/lib/release")
@@ -33,10 +34,21 @@ add_executable(musicpp
         src/credhelper.cpp
         src/discordpp_impl.cpp
         ${RESOURCE_FILE}
+        src/timeutils.cpp
+        src/consoleutils.cpp
+        src/stringutils.cpp
+        src/utils.cpp
 )
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_definitions(LOG_LEVEL_DEBUG)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_definitions(LOG_LEVEL_INFO)
+endif()
+
 set_target_properties(musicpp PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
 
-target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} Advapi32 leveldb::leveldb Shell32)
+target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} Advapi32 leveldb::leveldb Shell32 spdlog::spdlog)
 target_include_directories(musicpp PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
 target_compile_definitions(musicpp PRIVATE UNICODE _UNICODE)
 

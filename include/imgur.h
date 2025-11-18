@@ -6,8 +6,8 @@
 #define MUSICPP_IMGUR_H
 
 #include <string>
-#include <curl/curl.h>
 #include <winrt/Windows.Storage.Streams.h>
+#include <spdlog/spdlog.h>
 
 using namespace std;
 using namespace winrt;
@@ -15,7 +15,7 @@ using namespace Windows::Storage::Streams;
 
 class ImgurAPI {
 public:
-    ImgurAPI(const string &apikey);
+    ImgurAPI(const string &apikey, spdlog::logger *logger = nullptr);
 
     ~ImgurAPI();
 
@@ -28,7 +28,7 @@ public:
 private:
     string clientID;
 
-    static size_t WriteCallback(void *contents, size_t size, size_t nmemb, void *userp);
+    spdlog::logger* logger;
 };
 
 

@@ -16,10 +16,11 @@
 #include <spotify.h>
 #include <imgur.h>
 #include "leveldb/db.h"
+#include <spdlog/spdlog.h>
 
 class mediaPlayer {
 public:
-    mediaPlayer(SpotifyAPI *sapi, ImgurAPI *iapi, leveldb::DB *database);
+    mediaPlayer(SpotifyAPI *sapi, ImgurAPI *iapi, leveldb::DB *database, spdlog::logger *logger = nullptr);
 
     ~mediaPlayer();
 
@@ -70,15 +71,26 @@ private:
     wstring image_source;
     SpotifyAPI *spotify_client;
     ImgurAPI *imgur_client;
+    spdlog::logger* logger;
 
     winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession session = nullptr;
     winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm =
             winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
 
     void findRunning();
-
-    static string convertWString(const wstring &wstr);
 };
 
+struct ArtworkLog {
+    bool db_hit = false;
+    bool db_expired = false;
+    bool db_parse_error = false;
+    bool spotify_used = false;
+    bool imgur_used = false;
+    bool cache_written = false;
+
+    std::string db_url;
+    std::string final_url;
+    std::string final_source;
+};
 
 #endif //MUSICPP_MEDIAPLAYER_H

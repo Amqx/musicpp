@@ -7,9 +7,10 @@
 #include <wincred.h>
 #include <string>
 #include <vector>
+#include <spdlog/spdlog.h>
 
 std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &friendlyName,
-                              const std::wstring &helpUrl, bool forceReset) {
+                              const std::wstring &helpUrl, bool forceReset, spdlog::logger *logger) {
     std::wstring value = ReadGenericCredential(keyPath);
 
     if (value.empty() || forceReset) {
@@ -19,20 +20,25 @@ std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &f
         std::wstring newValue;
         std::wcin >> newValue;
 
-        WriteGenericCredential(keyPath, newValue);
+        WriteGenericCredential(keyPath, newValue, logger);
+        if (logger) {
+            logger->info("Stored new credential for {}", wstr_to_str(friendlyName.c_str()));
+        }
         return newValue;
     }
     return value;
 }
 
-inline void CheckError(BOOL result, const std::wstring &task) {
+inline void CheckError(BOOL result, const std::wstring &task, spdlog::logger *logger) {
     if (!result) {
         DWORD err = GetLastError();
-        std::wcerr << L"Failed to " << task << L". Error: " << err << std::endl;
+        if (logger) {
+            logger -> error("Failed to {}. Error code: {}", wstr_to_str(task.c_str()), err);
+        }
     }
 }
 
-void WriteGenericCredential(const std::wstring &targetName, const std::wstring &secret) {
+void WriteGenericCredential(const std::wstring &targetName, const std::wstring &secret, spdlog::logger *logger) {
     const auto *secretBuffer = reinterpret_cast<const BYTE *>(secret.c_str());
     const std::vector<BYTE> secretBlob(
         secretBuffer,
@@ -47,10 +53,10 @@ void WriteGenericCredential(const std::wstring &targetName, const std::wstring &
     cred.Persist = CRED_PERSIST_LOCAL_MACHINE;
     const BOOL success = CredWriteW(&cred, 0);
 
-    CheckError(success, L"write credential");
+    CheckError(success, L"write credential", logger);
 }
 
-std::wstring ReadGenericCredential(const std::wstring &targetName) {
+std::wstring ReadGenericCredential(const std::wstring &targetName, spdlog::logger *logger) {
     std::wstring credentialBuffer;
     PCREDENTIALW pCred = nullptr; // Pointer to receive the credential structure
 
@@ -75,20 +81,20 @@ std::wstring ReadGenericCredential(const std::wstring &targetName) {
     } else {
         DWORD err = GetLastError();
         if (err != ERROR_NOT_FOUND) {
-            CheckError(FALSE, L"read credential (Error code: " + std::to_wstring(err) + L")");
+            CheckError(FALSE, L"read credential (Error code: " + std::to_wstring(err) + L")", logger);
         }
     }
     return credentialBuffer;
 }
 
-void DeleteGenericCredential(const std::wstring &targetName) {
+void DeleteGenericCredential(const std::wstring &targetName, spdlog::logger *logger) {
     BOOL success = CredDeleteW(
         targetName.c_str(), // Target name
         CRED_TYPE_GENERIC, // Type
         0 // Flags (must be 0)
     );
 
-    CheckError(success, L"delete credential");
+    CheckError(success, L"delete credential", logger);
 }
 
 std::string wstr_to_str(const wchar_t *wstr) {

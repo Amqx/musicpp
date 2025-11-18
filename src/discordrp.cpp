@@ -3,61 +3,32 @@
 //
 
 #include <discordrp.h>
-#include <iostream>
+#include <stringutils.h>
 
-discordrp::discordrp(mediaPlayer *player, const uint64_t apikey) {
+
+discordrp::discordrp(mediaPlayer *player, const uint64_t apikey, spdlog::logger* logger) {
     this->appleMusic = player;
     this->clientID = apikey;
     running = true;
     this->refreshThread = thread(&discordrp::refreshLoop, this);
+    if (logger) {
+        logger->debug("Refresh thread started for discordrp.");
+    }
+    this -> logger = logger;
     client->SetApplicationId(clientID);
     client->Connect();
-}
-
-void discordrp::refreshLoop() const {
-    while (running) {
-        discordpp::RunCallbacks();
-        this_thread::sleep_for(std::chrono::milliseconds(10));
+    if (logger) {
+        logger->info("discordrp connection initialized.");
     }
-}
-
-string discordrp::convertWString(const wstring &wstr) {
-    if (wstr.empty()) {
-        return "";
-    }
-
-    int required_size = WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags
-        wstr.data(), // lpWideCharStr: Pointer to wide string data
-        static_cast<int>(wstr.length()), // cchWideChar: Length of the wide string (excluding null)
-        nullptr, // lpMultiByteStr: Output buffer (NULL to get size)
-        0, // cbMultiByte: Output buffer size (0 to get size)
-        nullptr, nullptr // lpDefaultChar, lpUsedDefaultChar
-    );
-
-    if (required_size <= 0) {
-        return ""; // Conversion error
-    }
-    std::string narrow_str(required_size, '\0');
-
-    WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags
-        wstr.data(), // lpWideCharStr
-        static_cast<int>(wstr.length()), // cchWideChar
-        &narrow_str[0], // lpMultiByteStr: Use the internal buffer (C++11+)
-        required_size, // cbMultiByte: Size of the buffer
-        nullptr, nullptr
-    );
-
-    return narrow_str;
 }
 
 discordrp::~discordrp() {
     running = false;
     client->Disconnect();
     if (refreshThread.joinable()) refreshThread.join();
+    if (this -> logger) {
+        logger -> info("discordrp Killed");
+    }
 }
 
 void discordrp::update() const {
@@ -93,14 +64,33 @@ void discordrp::update() const {
             assets.SetSmallText("Paused");
             activity.SetAssets(assets);
         }
-
-        client->UpdateRichPresence(activity, [](const discordpp::ClientResult &result) {
+        if (logger) {
+            logger->debug("Updating discordrp presence");
+        }
+        client->UpdateRichPresence(activity, [logger = this ->logger](const discordpp::ClientResult &result) {
             if (!result.Successful()) {
-                cerr << "Discord RPC update failed (" << static_cast<int>(result.Type())
-                        << "): " << result.Error() << endl;
+                if (logger) {
+                    logger -> error("Discord RPC update failed ({}): {}", static_cast<int>(result.Type()), result.Error());
+                }
             }
         });
     } else {
+        if (logger) {
+            logger->debug("Clearing Discord Rich Presence (missing metadata).");
+        }
         client->ClearRichPresence();
+    }
+}
+
+void discordrp::refreshLoop() const {
+    while (running) {
+        try {
+            discordpp::RunCallbacks();
+        } catch (exception &e) {
+            if (logger) {
+                logger -> warn("Error in discordrp refresh loop: {}", e.what());
+            }
+        }
+        this_thread::sleep_for(std::chrono::milliseconds(10));
     }
 }
