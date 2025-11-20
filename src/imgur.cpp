@@ -36,7 +36,7 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
     vector<uint8_t> imageData(static_cast<size_t>(size));
 
     if (logger) {
-        logger -> info("Performing Imgur upload with size: {} bytes", size);
+        logger -> info("Performing Imgur upload with size: {} kB", size/1024);
     }
 
     DataReader reader(stream);

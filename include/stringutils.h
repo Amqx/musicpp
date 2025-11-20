@@ -21,4 +21,8 @@ double calculateSimilarity(const std::string &str1, const std::string &str2);
 
 std::string toLowerCase(const std::string &str);
 
+std::string discord_bounds(const std::wstring &wstr, const std::string &fallback);
+
+std::string sanitizeKeys(std::string input);
+
 #endif //MUSICPP_STRINGUTILS_H

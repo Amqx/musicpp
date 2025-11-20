@@ -44,7 +44,7 @@ string SpotifyAPI::getAccessToken() {
     return accessToken;
 }
 
-string SpotifyAPI::searchTracks(const string &title, const string &artist, const string &album) {
+spotifyResult SpotifyAPI::searchTracks(const string &title, const string &artist, const string &album) {
     string readBuffer;
 
     ostringstream query;
@@ -58,6 +58,8 @@ string SpotifyAPI::searchTracks(const string &title, const string &artist, const
         logger -> debug("Performing Spotify search with query: {}", fullQuery);
     }
 
+    spotifyResult result = {"", ""};
+
     string url = "https://api.spotify.com/v1/search?" + fullQuery;
 
     CURL *curl = curl_easy_init();
@@ -65,7 +67,7 @@ string SpotifyAPI::searchTracks(const string &title, const string &artist, const
         if (logger) {
             logger -> warn("Failed to initialize CURL for Spotify searchTracks.");
         }
-        return "failed";
+        return result;
     }
 
     struct curl_slist *headers = nullptr;
@@ -78,16 +80,137 @@ string SpotifyAPI::searchTracks(const string &title, const string &artist, const
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
 
     CURLcode res = curl_easy_perform(curl);
-    delete headers;
+    curl_slist_free_all(headers);
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
         if (logger) {
             logger -> warn("Failed to perform Spotify search: {}", curl_easy_strerror(res));
         }
-        return "failed";
+        return result;
     }
-    return getAlbumImageUrl(readBuffer, toLowerCase(title), toLowerCase(artist), toLowerCase(album));
+
+    try {
+        json j = json::parse(readBuffer);
+        if (!j.contains("tracks") || !j["tracks"].contains("items") ||
+            j["tracks"]["items"].empty()) {
+            return result;
+        }
+
+        json track = j["tracks"]["items"][0];
+        string trackName, artistName, albumName;
+        if (track.contains("name")) {
+            trackName = track["name"];
+        }
+        if (track.contains("artists") && !track["artists"].empty() &&
+            track["artists"][0].contains("name")) {
+            artistName = track["artists"][0]["name"];
+        }
+        if (track.contains("album") && track["album"].contains("name")) {
+            albumName = track["album"]["name"];
+        }
+
+        double titleSimilarity = -1;
+        double artistSimilarity = -1;
+        double albumSimilarity = -1;
+
+        if (trackName.length() > 5 && title.length() > 5 && (title.find(toLowerCase(trackName)) !=
+            std::string::npos ||
+            trackName.find(toLowerCase(title)) != std::string::npos)) {
+            titleSimilarity = 100.0;
+        }
+        if (artistName.length() > 5 && artist.length() > 5 && (artist.find(toLowerCase(artistName)) !=
+            std::string::npos ||
+            artistName.find(toLowerCase(artist)) != std::string::npos)) {
+            artistSimilarity = 100.0;
+        }
+        if (albumName.length() > 5 && album.length() > 5 && (album.find(toLowerCase(albumName)) !=
+            std::string::npos ||
+            albumName.find(toLowerCase(album)) != std::string::npos)) {
+            albumSimilarity = 100.0;
+        }
+
+        if (titleSimilarity < 0) {
+            titleSimilarity = calculateSimilarity(trackName, title);
+        }
+        if (artistSimilarity < 0) {
+            artistSimilarity = calculateSimilarity(artistName, artist);
+        }
+
+        if (albumSimilarity < 0) {
+            albumSimilarity = calculateSimilarity(albumName, album);
+        }
+
+        double weightedScore = (0.4 * titleSimilarity) + (0.4 * artistSimilarity) + (0.2 * albumSimilarity);
+        if (weightedScore < 50.0 || artistSimilarity < 30.0 || titleSimilarity < 30.0) {
+            return result;
+        }
+
+        if (track.contains("album")) {
+            if (track["album"].contains("images")) {
+                json images = track["album"]["images"];
+
+                string url640;
+                string url300;
+
+                // Iterate through images to find 640x640 and 300x300
+                for (const auto &image: images) {
+                    if (image.contains("height") && image.contains("width") &&
+                        image.contains("url")) {
+                        int height = image["height"];
+                        int width = image["width"];
+
+                        if (height == 640 && width == 640) {
+                            url640 = image["url"];
+                        }
+
+                        if (height == 300 && width == 300) {
+                            url300 = image["url"];
+                        }
+                        }
+                }
+
+                // Return 640x640 if available, otherwise 300x300, otherwise "failed"
+                if (!url640.empty()) {
+                    result.image = url640;
+                } else if (!url300.empty()) {
+                    result.image = url300;
+                }
+            }
+
+            if (track["album"].contains("external_urls")) {
+                string temp = track["album"]["external_urls"]["spotify"];
+                if (!temp.empty()) {
+                    result.url = temp;
+                    return result;
+                }
+            }
+
+            if (track["album"].contains("id")) {
+                string temp = "https://open.spotify.com/album/";
+                string p2 = track["album"]["id"];
+                temp += p2;
+                if (!temp.empty()) {
+                    result.url = temp;
+                    return result;
+                }
+            }
+            return result;
+        }
+        return result;
+    } catch (json::parse_error &e) {
+        if (logger) {
+            logger -> warn("JSON parse error in Spotify searchTracks: {}", e.what());
+        }
+        return result;
+    } catch (exception &e) {
+        if (logger) {
+            logger -> warn("Other error in Spotify searchTracks: {}", e.what());
+        }
+        result.url = "";
+        result.image = "";
+        return result;
+    }
 }
 
 bool SpotifyAPI::requestToken() {
@@ -182,122 +305,5 @@ void SpotifyAPI::refreshLoop() {
         if (!requestToken()) {
             if (logger) logger -> warn("Failed to refresh Spotify token.");
         }
-    }
-}
-
-string SpotifyAPI::getAlbumImageUrl(const string &jsonString, const string &inputTitle, const string &inputArtist,
-    const string &inputAlbum) const {
-    try {
-        json j = json::parse(jsonString);
-
-        // Check if tracks exist and items array is not empty
-        if (!j.contains("tracks") || !j["tracks"].contains("items") ||
-            j["tracks"]["items"].empty()) {
-            return "failed";
-        }
-
-        // Get the first track item
-        json track = j["tracks"]["items"][0];
-
-        // Extract track name, artist name, and album name from JSON
-        string trackName;
-        string artistName;
-        string albumName;
-
-        // Get track name
-        if (track.contains("name")) {
-            trackName = track["name"];
-        }
-
-        // Get artist name (first artist)
-        if (track.contains("artists") && !track["artists"].empty() &&
-            track["artists"][0].contains("name")) {
-            artistName = track["artists"][0]["name"];
-        }
-
-        // Get album name
-        if (track.contains("album") && track["album"].contains("name")) {
-            albumName = track["album"]["name"];
-        }
-
-        double titleSimilarity = -1;
-        double artistSimilarity = -1;
-        double albumSimilarity = -1;
-
-        if (trackName.length() > 5 && inputTitle.length() > 5 && (inputTitle.find(toLowerCase(trackName)) !=
-            std::string::npos ||
-            trackName.find(toLowerCase(inputTitle)) != std::string::npos)) {
-            titleSimilarity = 100.0;
-        }
-
-        if (artistName.length() > 5 && inputArtist.length() > 5 && (inputArtist.find(toLowerCase(artistName)) !=
-            std::string::npos ||
-            artistName.find(toLowerCase(inputArtist)) != std::string::npos)) {
-            artistSimilarity = 100.0;
-        }
-
-        if (albumName.length() > 5 && inputAlbum.length() > 5 && (inputAlbum.find(toLowerCase(albumName)) !=
-            std::string::npos ||
-            albumName.find(toLowerCase(inputAlbum)) != std::string::npos)) {
-                        albumSimilarity = 100.0;
-        }
-
-        // Calculate similarities
-        if (titleSimilarity < 0) {
-            titleSimilarity = calculateSimilarity(trackName, inputTitle);
-        }
-
-        if (artistSimilarity < 0) {
-            artistSimilarity = calculateSimilarity(artistName, inputArtist);
-        }
-
-        if (albumSimilarity < 0) {
-            albumSimilarity = calculateSimilarity(albumName, inputAlbum);
-        }
-
-        // move to a weighted score algorithm: place higher emphasis on title and artist similarity,
-        // and be more forgiving if the album similarity is low
-        double weightedScore = (0.4 * titleSimilarity) + (0.4 * artistSimilarity) + (0.2 * albumSimilarity);
-        if (weightedScore < 50.0 || artistSimilarity < 30.0 || titleSimilarity < 30.0) {
-            return "failed";
-        }
-
-        // Look for images in the album object
-        if (track.contains("album") && track["album"].contains("images")) {
-            json images = track["album"]["images"];
-
-            string url640;
-            string url300;
-
-            // Iterate through images to find 640x640 and 300x300
-            for (const auto &image: images) {
-                if (image.contains("height") && image.contains("width") &&
-                    image.contains("url")) {
-                    int height = image["height"];
-                    int width = image["width"];
-
-                    if (height == 640 && width == 640) {
-                        url640 = image["url"];
-                    }
-                }
-            }
-
-            // Return 640x640 if available, otherwise 300x300, otherwise "failed"
-            if (!url640.empty()) {
-                return url640;
-            }
-        }
-
-        return "failed";
-    } catch (json::parse_error &e) {
-        if (logger) {
-            logger -> warn("JSON parse error in Spotify getAlbumImageUrl: {}", e.what());
-        }
-        return "failed";
-    } catch (exception &e) {
-        if (logger) {
-            logger -> warn("Other error in Spotify getAlbumImageUrl: {}", e.what());
-        }
-        return "failed";
     }
 }

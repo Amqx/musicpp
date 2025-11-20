@@ -13,6 +13,11 @@
 
 using namespace std;
 
+struct spotifyResult {
+    std::string url;
+    std::string image;
+};
+
 class SpotifyAPI {
 public:
     SpotifyAPI(const string &apikey, const string &apisecret, spdlog::logger *logger = nullptr);
@@ -26,7 +31,7 @@ public:
 
     string getAccessToken();
 
-    string searchTracks(const string &title = "",
+    spotifyResult searchTracks(const string &title = "",
                         const string &artist = "",
                         const string &album = "");
 
@@ -43,10 +48,5 @@ private:
     bool requestToken();
 
     void refreshLoop();
-
-    string getAlbumImageUrl(const string &jsonString,
-                                   const string &inputTitle,
-                                   const string &inputArtist,
-                                   const string &inputAlbum) const;
 };
 #endif //MUSICPP_SPOTIFY_H

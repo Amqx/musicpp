@@ -10,7 +10,8 @@
 #include <leveldb/db.h>
 #include <stringutils.h>
 
-mediaPlayer::mediaPlayer(SpotifyAPI *sapi, ImgurAPI *iapi, leveldb::DB *database, spdlog::logger *logger) {
+mediaPlayer::mediaPlayer(amscraper *scraper, SpotifyAPI *sapi, ImgurAPI *iapi, leveldb::DB *database, spdlog::logger *logger) {
+    this->scraper = scraper;
     this->spotify_client = sapi;
     this->imgur_client = iapi;
     this->db = database;
@@ -56,6 +57,14 @@ wstring mediaPlayer::getImage() {
         return this->image;
     }
     return L"default";
+}
+
+wstring mediaPlayer::getSpotifyLink() {
+    return this->spotify_link;
+}
+
+wstring mediaPlayer::getAMLink() {
+    return this->amlink;
 }
 
 wstring mediaPlayer::getImageSource() {
@@ -165,13 +174,13 @@ void mediaPlayer::getInfo() {
 
         // song information - album, artist, title
         auto albumArtistValue = properties.AlbumArtist();
-        bool albumArtistProvided = !albumArtistValue.empty();
-        wstring albumArtist = albumArtistValue.c_str();
-        auto albumTitle = properties.AlbumTitle();
-        auto trackArtist = properties.Artist();
+        auto trackTitle = properties.Title();
+        this->title = trackTitle.c_str();
 
-        // if any two are empty we can assume nothing is playing
-        if (albumArtistValue.empty() || properties.Title().empty()) {
+        wstring s1 = albumArtistValue.c_str();
+
+        // if any two are empty we ignore
+        if (albumArtistValue.empty() || trackTitle.empty()) {
             if (this->logger) {
                 this->logger->debug("albumArtist or title empty; assuming nothing is playing. Resetting.");
             }
@@ -179,40 +188,24 @@ void mediaPlayer::getInfo() {
             return;
         }
 
-        this->title = properties.Title().c_str();
-
-        if (!albumTitle.empty()) {
-            this->album = trim_copy(albumTitle.c_str());
+        size_t sep = s1.find(L'\u2014');
+        if (sep == wstring::npos) {
+            if (this -> logger) {
+                this->logger->debug("Custom song deteccted/ No EM dash found.");
+            }
+            this -> album = s1;
+            this -> artist = s1;
         } else {
-            this->album.clear();
-        }
+            wstring p1, p2;
+            this -> artist = s1.substr(0, sep-1);
+            this -> album = s1.substr(sep+2);
 
-        if (!trackArtist.empty()) {
-            this->artist = trim_copy(trackArtist.c_str());
-        } else {
-            this->artist.clear();
-        }
-
-        if ((this->artist.empty() || this->album.empty() || this->artist == albumArtist || this->album == albumArtist)
-            && albumArtistProvided) {
-            wstring parsedArtist;
-            wstring parsedAlbum;
-            if (split_artist_album(albumArtist, parsedArtist, parsedAlbum)) {
-                wstring trimmedAlbumArtist = trim_copy(albumArtist);
-                if (this->artist.empty() || this->artist == albumArtist || this->artist == trimmedAlbumArtist) {
-                    this->artist = parsedArtist;
-                }
-                if (this->album.empty() || this->album == albumArtist || this->album == trimmedAlbumArtist) {
-                    this->album = parsedAlbum;
+            // save down multiple EM dash songs for later investigation
+            if (this -> album.find(L'\u2014') != wstring::npos) {
+                if (this -> logger) {
+                    this -> logger -> warn("Multiple EM dashes detected: {}", convertWString(s1));
                 }
             }
-        }
-
-        if (this->artist.empty() && albumArtistProvided) {
-            this->artist = trim_copy(albumArtist);
-        }
-        if (this->album.empty() && albumArtistProvided) {
-            this->album = trim_copy(albumArtist);
         }
 
         // compare new info against old, if anything changed, update photo
@@ -227,28 +220,34 @@ void mediaPlayer::getInfo() {
                                    convertWString(this->album));
             }
         }
+
         if (refresh) {
             ArtworkLog logInfo;
             this->image_source = L"";
+            this->amlink = L"";
+            this->spotify_link = L"";
             string stitle = convertWString(title);
             string sartist = convertWString(artist);
             string salbum = convertWString(album);
-            string songKey = stitle + '|' + sartist + '|' + salbum;
+            string songKey = sanitizeKeys(stitle) + '|' + sanitizeKeys(sartist) + '|' + sanitizeKeys(salbum);
 
             // check database
             if (db) {
+                // finding image
                 string result;
                 leveldb::Status status = db->Get(leveldb::ReadOptions(), songKey, &result);
                 if (status.ok()) {
-                    logInfo.db_hit = true;
-                    size_t firstSep = result.find('|');
-                    if (firstSep == string::npos) {
-                        logInfo.db_parse_error = true;
-                    } else {
+                    logInfo.db_hit_image = true;
+                    try {
+                        size_t firstSep = result.find('|');
+                        if (firstSep == string::npos) {
+                            throw invalid_argument("Missing first separator");
+                        }
                         time_t timestamp = stoll(result.substr(0, firstSep));
                         size_t secondSep = result.find('|', firstSep + 1);
                         string url;
                         string source;
+
                         if (secondSep == string::npos) {
                             url = result.substr(firstSep + 1);
                         } else {
@@ -259,8 +258,8 @@ void mediaPlayer::getInfo() {
                         if (!url.empty()) {
                             if (currTime - timestamp > 24 * 7 * 60 * 60) {
                                 db->Delete(leveldb::WriteOptions(), songKey);
-                                logInfo.db_expired = true;
-                                this->image = L"failed";
+                                logInfo.db_image_expired = true;
+                                this->image = L"";
                                 this->image_source = L"DB, expired";
                             } else {
                                 this->image = wstring(url.begin(), url.end());
@@ -273,27 +272,145 @@ void mediaPlayer::getInfo() {
                                 logInfo.db_url = url;
                             }
                         }
+                    } catch (const exception& e) {
+                        if (this->logger) {
+                            this->logger->warn("DB Image Parse Error for '{}': {}", songKey, e.what());
+                        }
+                        db->Delete(leveldb::WriteOptions(), songKey);
+                        logInfo.db_parse_error = true;
+                        this->image.clear();
+                    }
+                }
+
+                // finding apple music link
+                string AMResult;
+                string amKey = "musicppAM" + songKey;
+                leveldb::Status AMstatus = db->Get(leveldb::ReadOptions(), amKey, &AMResult);
+                if (AMstatus.ok()) {
+                    logInfo.db_hit_amlink = true;
+                    try {
+                        size_t AMsep = AMResult.find('|');
+                        if (AMsep == string::npos) {
+                            throw invalid_argument("Missing AM separator");
+                        }
+                        time_t timestamp = stoll(AMResult.substr(0, AMsep));
+                        string url = AMResult.substr(AMsep + 1);
+
+                        if (!url.empty()) {
+                            if (currTime - timestamp > 24*7*60*60) {
+                                db->Delete(leveldb::WriteOptions(), amKey);
+                                logInfo.db_amlink_expired = true;
+                            } else {
+                                this->amlink = wstring(url.begin(), url.end());
+                                logInfo.AM_link_available = true;
+                            }
+                        }
+                    } catch (const exception &e) {
+                        if (this->logger) {
+                            this->logger->warn("DB AM Link Parse Error: {}. Deleting key.", e.what());
+                        }
+                        db->Delete(leveldb::WriteOptions(), amKey);
+                        logInfo.db_parse_error = true;
+                        this->amlink.clear();
+                    }
+
+                }
+
+                // finding spotify link
+                string SpotifyResult;
+                string spKey = "musicppSP" + songKey;
+                leveldb::Status SpotifyStatus = db->Get(leveldb::ReadOptions(), "musicppSP" + songKey, &SpotifyResult);
+                if (SpotifyStatus.ok()) {
+                    logInfo.db_hit_spotifylink = true;
+                    try {
+                        size_t SPsep = SpotifyResult.find('|');
+                        if (SPsep == string::npos) {
+                            throw invalid_argument("Missing Spotify separator");
+                        }
+
+                        time_t timestamp = stoll(SpotifyResult.substr(0, SPsep));
+                        string url = SpotifyResult.substr(SPsep + 1);
+
+                        if (!url.empty()) {
+                            if (currTime - timestamp > 24 * 7 * 60 * 60) {
+                                db->Delete(leveldb::WriteOptions(), spKey);
+                                logInfo.db_spotifylink_expired = true;
+                            } else {
+                                this->spotify_link = wstring(url.begin(), url.end());
+                                logInfo.Spotify_link_available = true;
+                            }
+                        }
+                    } catch (const exception &e) {
+                        if (this->logger) {
+                            this->logger->warn("DB Spotify Link Parse Error: {}. Deleting key.", e.what());
+                        }
+                        db->Delete(leveldb::WriteOptions(), spKey);
+                        logInfo.db_parse_error = true;
+                        this->spotify_link.clear();
                     }
                 }
             }
 
-            // Spotify search
-            if ((this->image == L"failed" || this->image.empty()) && this->spotify_client != nullptr) {
-                string tn = this->spotify_client->searchTracks(stitle, sartist, salbum);
-                if (!tn.empty() && tn != "failed") {
-                    string value = to_string(currTime) + "|" + tn + "|Spotify";
+            // Apple Music search,  on fail the fields of res will be empty
+            // Should run if we are missing either the image or amlink
+            if (this->scraper && (this -> image.empty() || this->amlink.empty())) {
+                scraperResult res = this->scraper->searchTracks(stitle, sartist, salbum);
+
+                // Only update image if we don't have one already
+                if (!res.image.empty() && this->image.empty()) {
+                    string value = to_string(currTime) + "|" + res.image + "|AppleMusic";
+                    logInfo.scraper_used = true;
+                    if (db) {
+                        db->Put(leveldb::WriteOptions(), songKey, value);
+                        logInfo.cache_written = true;
+                    }
+                    this ->image = wstring(res.image.begin(), res.image.end());
+                    this->image_source = L"AppleMusic";
+                }
+
+                // Always update the link if we have it
+                if (!res.url.empty()) {
+                    string urlKey = "musicppAM" + songKey;
+                    string value = to_string(currTime) + "|" + res.url;
+                    logInfo.AM_link_available = true;
+                    if (db) {
+                        db->Put(leveldb::WriteOptions(), urlKey,value);
+                    }
+                    this->amlink = wstring(res.url.begin(), res.url.end());
+                }
+            }
+
+            // Spotify search, on fail the fields of res will be empty
+            // Should run if we are missing either the image or spotify_link
+            if (this->spotify_client && (this->image.empty() || this->spotify_link.empty())) {
+                spotifyResult res = this->spotify_client->searchTracks(stitle, sartist, salbum);
+
+                // Similarily, only update the image if we don't have it
+                if (!res.image.empty() && this->image.empty()) {
+                    string value = to_string(currTime) + "|" + res.image + "|Spotify";
                     logInfo.spotify_used = true;
                     if (db) {
                         db->Put(leveldb::WriteOptions(), songKey, value);
                         logInfo.cache_written = true;
                     }
+                    this->image = wstring(res.image.begin(), res.image.end());
+                    this->image_source = L"Spotify";
                 }
-                this->image = wstring(tn.begin(), tn.end());
-                this->image_source = L"Spotify";
+
+                // Once again, always update the link if available
+                if (!res.url.empty()) {
+                    string urlKey = "musicppSP" + songKey;
+                    string value = to_string(currTime) + "|" + res.url;
+                    logInfo.Spotify_link_available = true;
+                    if (db) {
+                        db->Put(leveldb::WriteOptions(), urlKey,value);
+                    }
+                    this->spotify_link = wstring(res.url.begin(), res.url.end());
+                }
             }
 
-            // imgur upload, if failed returns "default"
-            if ((this->image == L"failed" || this->image.empty()) && imgur_client != nullptr) {
+            // imgur upload, if failed imgur will always return default
+            if (this->image.empty() && imgur_client) {
                 auto thumb = properties.Thumbnail();
                 string tn = this->imgur_client->uploadImage(thumb);
                 if (tn != "default" && !tn.empty()) {
@@ -320,19 +437,29 @@ void mediaPlayer::getInfo() {
                 this->logger->info(
                     "Artwork refresh: title='{}' | artist='{}' | album='{}' | "
                     "final_url='{}' | source='{}' | "
-                    "db_hit={} db_expired={} db_parse_error={} "
-                    "spotify_used={} imgur_used={} cache_written={}",
+                    "db_hit_image={} db_image_expired={} "
+                    "db_hit_amlink={} db_amlink_expired={} "
+                    "db_hit_spotifylink={} db_spotifylink_expired={} db_parse_error={} "
+                    "scraper_used={} spotify_used={} imgur_used={} cache_written={} "
+                    "AM_link_available={} Spotify_link_available={}",
                     convertWString(title),
                     convertWString(artist),
                     convertWString(album),
                     logInfo.final_url,
                     logInfo.final_source,
-                    logInfo.db_hit,
-                    logInfo.db_expired,
+                    logInfo.db_hit_image,
+                    logInfo.db_image_expired,
+                    logInfo.db_hit_amlink,
+                    logInfo.db_amlink_expired,
+                    logInfo.db_hit_spotifylink,
+                    logInfo.db_spotifylink_expired,
                     logInfo.db_parse_error,
+                    logInfo.scraper_used,
                     logInfo.spotify_used,
                     logInfo.imgur_used,
-                    logInfo.cache_written
+                    logInfo.cache_written,
+                    logInfo.AM_link_available,
+                    logInfo.Spotify_link_available
                 );
             }
 
@@ -357,11 +484,16 @@ void mediaPlayer::pause() {
 }
 
 void mediaPlayer::play() {
+    bool prev_state = this->playing;
     this->playing = true;
     this->pauseTime = INVALID_TIME;
     if (this->logger) {
-        this->logger->debug("Resumed playback. start_ts={}, end_ts={}.",
+        if (prev_state != this->playing) {
+            this->logger->debug("Resumed playback. start_ts={}, end_ts={}.",
                            this->start_ts, this->end_ts);
+        } else {
+            this->logger->debug("Retained playing state");
+        }
     }
 }
 
@@ -377,7 +509,7 @@ void mediaPlayer::reset() {
     this->image = L"";
     this->image_source = L"";
     this->spotify_link = L"";
-    this->itunes_link = L"";
+    this->amlink = L"";
     this->start_ts = INVALID_TIME;
     this->end_ts = INVALID_TIME;
     this->pauseTime = INVALID_TIME;
@@ -393,7 +525,7 @@ void mediaPlayer::printInfo() const {
     wcout << L"Image url: " << image << endl;
     wcout << L"Image source: " << image_source << endl;
     wcout << L"Spotify link: " << spotify_link << endl;
-    wcout << L"Itunes link: " << itunes_link << endl;
+    wcout << L"Apple Music link: " << amlink << endl;
     wcout << L"Start timestamp (UNIX): " << start_ts << endl;
     wcout << L"End timestamp (UNIX): " << end_ts << endl;
     wcout << L"Currently playing: " << playing << endl;

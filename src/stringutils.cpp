@@ -42,80 +42,6 @@ string convertWString(const wstring &wstr) {
     return narrow_str;
 }
 
-bool is_extended_whitespace(wchar_t ch) {
-    if (ch == L' ' || ch == L'\t' || ch == L'\n' || ch == L'\r' || ch == L'\f' || ch == L'\v') {
-        return true;
-    }
-    if (ch == 0x00A0 || ch == 0x2007 || ch == 0x202F) {
-        return true;
-    }
-    if (ch >= 0x2000 && ch <= 0x200A) {
-        return true;
-    }
-    return false;
-}
-
-wstring trim_copy(const wstring &value) {
-    if (value.empty()) {
-        return L"";
-    }
-
-    size_t first = 0;
-    while (first < value.size() && is_extended_whitespace(value[first])) {
-        ++first;
-    }
-    if (first == value.size()) {
-        return L"";
-    }
-
-    size_t last = value.size() - 1;
-    while (last > first && is_extended_whitespace(value[last])) {
-        --last;
-    }
-    return value.substr(first, last - first + 1);
-}
-
-bool split_artist_album(const wstring &input, wstring &outArtist, wstring &outAlbum) {
-    auto is_dash = [](wchar_t ch) {
-        return ch == L'-' || ch == 0x2013 || ch == 0x2014 || ch == 0x2015 || ch == 0x2212;
-    };
-
-    for (size_t dashPos = 0; dashPos < input.size(); ++dashPos) {
-        wchar_t dashChar = input[dashPos];
-        if (!is_dash(dashChar)) {
-            continue;
-        }
-
-        size_t artistEnd = dashPos;
-        while (artistEnd > 0 && is_extended_whitespace(input[artistEnd - 1])) {
-            --artistEnd;
-        }
-
-        size_t albumStart = dashPos + 1;
-        while (albumStart < input.size()) {
-            wchar_t ch = input[albumStart];
-            if (ch == dashChar || is_extended_whitespace(ch)) {
-                ++albumStart;
-            } else {
-                break;
-            }
-        }
-
-        wstring candidateArtist = trim_copy(input.substr(0, artistEnd));
-        wstring candidateAlbum = trim_copy(albumStart < input.size() ? input.substr(albumStart) : L"");
-
-        if (!candidateArtist.empty() && !candidateAlbum.empty()) {
-            outArtist = std::move(candidateArtist);
-            outAlbum = std::move(candidateAlbum);
-            return true;
-        }
-    }
-
-    outArtist.clear();
-    outAlbum.clear();
-    return false;
-}
-
 int levenshteinDistance(const string &s1, const string &s2) {
     const size_t len1 = s1.size();
     const size_t len2 = s2.size();
@@ -160,4 +86,39 @@ string toLowerCase(const string &str) {
     ranges::transform(result, result.begin(),
                       [](const unsigned char c) { return tolower(c); });
     return result;
+}
+
+std::string discord_bounds(const wstring &wstr, const string &fallback) {
+    size_t len = wstr.length();
+    if (len > 128) {
+        string input = convertWString(wstr);
+        auto l = input.begin();
+        while (l != input.end() && isspace(*l)) ++l;
+        auto r = input.end();
+        do {
+            if (r == l) {
+                break;
+            }
+            --r;
+        } while (isspace(*r));
+
+        string out;
+        if (r>=l) {
+            out.assign (l, r+1);
+        }
+        if (out.size() > 128) {
+            out.resize(128);
+        }
+
+        return out;
+    }
+    if (len <= 1) {
+        return fallback;
+    }
+    return convertWString(wstr);
+}
+
+std::string sanitizeKeys(std::string input) {
+    std::replace(input.begin(), input.end(), '|', '-');
+    return input;
 }

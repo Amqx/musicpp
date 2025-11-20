@@ -9,6 +9,8 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 
+#include "stringutils.h"
+
 std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &friendlyName,
                               const std::wstring &helpUrl, bool forceReset, spdlog::logger *logger) {
     std::wstring value = ReadGenericCredential(keyPath);
@@ -22,7 +24,7 @@ std::wstring EnsureCredential(const std::wstring &keyPath, const std::wstring &f
 
         WriteGenericCredential(keyPath, newValue, logger);
         if (logger) {
-            logger->info("Stored new credential for {}", wstr_to_str(friendlyName.c_str()));
+            logger->info("Stored new credential for {}", convertWString(friendlyName.c_str()));
         }
         return newValue;
     }
@@ -33,7 +35,7 @@ inline void CheckError(BOOL result, const std::wstring &task, spdlog::logger *lo
     if (!result) {
         DWORD err = GetLastError();
         if (logger) {
-            logger -> error("Failed to {}. Error code: {}", wstr_to_str(task.c_str()), err);
+            logger -> error("Failed to {}. Error code: {}", convertWString(task.c_str()), err);
         }
     }
 }
@@ -95,41 +97,4 @@ void DeleteGenericCredential(const std::wstring &targetName, spdlog::logger *log
     );
 
     CheckError(success, L"delete credential", logger);
-}
-
-std::string wstr_to_str(const wchar_t *wstr) {
-    if (wstr == nullptr) {
-        return "";
-    }
-
-    int required_size = WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags: Default flags
-        wstr, // lpWideCharStr: The source wide string
-        -1, // cchWideChar: Input string is null-terminated
-        nullptr, // lpMultiByteStr: Output buffer (NULL to get size)
-        0, // cbMultiByte: Output buffer size (0 to get size)
-        nullptr, // lpDefaultChar: Not used with CP_UTF8
-        nullptr // lpUsedDefaultChar: Not used with CP_UTF8
-    );
-
-    if (required_size <= 0) {
-        return "";
-    }
-
-    std::string narrow_str(required_size, '\0');
-
-    WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags
-        wstr, // lpWideCharStr
-        -1, // cchWideChar
-        &narrow_str[0], // lpMultiByteStr: Use the internal buffer of the std::string
-        required_size, // cbMultiByte: Size of the buffer
-        nullptr, // lpDefaultChar
-        nullptr // lpUsedDefaultChar
-    );
-
-    narrow_str.resize(required_size - 1);
-    return narrow_str;
 }

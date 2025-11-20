@@ -34,39 +34,87 @@ discordrp::~discordrp() {
 void discordrp::update() const {
     if (!appleMusic->getTitle().empty() && !appleMusic->getArtist().empty() && !appleMusic->getAlbum().empty()) {
         discordpp::Activity activity;
+
+        const string title = discord_bounds(appleMusic -> getTitle(), "Unknown Song");
+        const string artist = discord_bounds(appleMusic -> getArtist(), "Unknown Artist");
+        const string album = discord_bounds(appleMusic -> getAlbum(), "Unknown Album");
+        const string imglink = convertWString(appleMusic->getImage());
+        const string amlink = convertWString(appleMusic->getAMLink());
+        const string splink = convertWString(appleMusic->getSpotifyLink());
+
+        // Basic info
+        activity.SetName(artist);
+        activity.SetDetails(title); // title
+        activity.SetState(artist); // artist
+        activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::Details);
         activity.SetType(discordpp::ActivityTypes::Listening);
-        activity.SetName(convertWString(appleMusic->getArtist()));
-        activity.SetDetails(convertWString(appleMusic->getTitle())); // title
-        activity.SetState(convertWString(appleMusic->getArtist())); // artist
+        if (logger) {
+            logger -> debug("Activity (name, details, state): '{}' '{}' '{}'", artist + convertWString(L" \uf3b4"), title, artist);
+        }
 
-        // enable listening to:
-        activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::State);
+        // Images
+        discordpp::ActivityAssets assets;
+        assets.SetLargeImage(imglink);
+        if (imglink != "default") {
+            assets.SetLargeUrl(imglink);
+        }
+        assets.SetLargeText(album);
+        if (logger) {
+            logger -> debug("Assets (large image, large text): '{}' '{}'", imglink, album);
+        }
 
+        // Time
+        discordpp::ActivityTimestamps timestamps;
         if (appleMusic->getState()) {
-            discordpp::ActivityTimestamps timestamps;
             timestamps.SetStart(appleMusic->getStartTS());
             timestamps.SetEnd(static_cast<uint64_t>(appleMusic->getEndTS()));
             activity.SetTimestamps(timestamps);
-
-            discordpp::ActivityAssets assets;
-            assets.SetLargeImage(convertWString(appleMusic->getImage()));
-            assets.SetLargeText(convertWString(appleMusic->getAlbum()));
-            activity.SetAssets(assets);
+            if (logger) {
+                logger -> debug("Timestamps (start, end): '{}' '{}'", appleMusic->getStartTS(), appleMusic->getEndTS());
+            }
         } else {
-            discordpp::ActivityTimestamps timestamps;
             timestamps.SetStart(appleMusic->getPauseTimer());
             activity.SetTimestamps(timestamps);
-
-            discordpp::ActivityAssets assets;
-            assets.SetLargeImage(convertWString(appleMusic->getImage()));
-            assets.SetLargeText(convertWString(appleMusic->getAlbum()));
             assets.SetSmallImage("pause");
             assets.SetSmallText("Paused");
-            activity.SetAssets(assets);
+            if (logger) {
+                logger -> debug("Timestamps (paused at): '{}'", appleMusic->getPauseTimer());
+            }
         }
+
+        // Buttons
+        if (!amlink.empty()) {
+            discordpp::ActivityButton button1;
+            button1.SetLabel("Apple Music");
+            button1.SetUrl(amlink);
+            activity.AddButton(button1);
+            if (logger) {
+                if (button1) {
+                    logger -> debug("Added Apple Music button with URL: '{}'", amlink);
+                } else {
+                    logger -> debug("Invalid Apple Music button with URL: '{}'", amlink);
+                }
+            }
+        }
+        if (!splink.empty()) {
+            discordpp::ActivityButton button2;
+            button2.SetLabel("Spotify");
+            button2.SetUrl(splink);
+            activity.AddButton(button2);
+            if (logger) {
+                if (button2) {
+                    logger -> debug("Added Spotify button with URL: '{}'", splink);
+                } else {
+                    logger -> debug("Invalid Spotify button with URL: '{}'", splink);
+                }
+            }
+        }
+
         if (logger) {
             logger->debug("Updating discordrp presence");
         }
+
+        activity.SetAssets(assets);
         client->UpdateRichPresence(activity, [logger = this ->logger](const discordpp::ClientResult &result) {
             if (!result.Successful()) {
                 if (logger) {
