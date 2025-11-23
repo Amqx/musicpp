@@ -31,11 +31,11 @@ public:
     string getAccessToken();
 
     searchResult searchTracks(const string &title = "",
-                        const string &artist = "",
-                        const string &album = "");
+                              const string &artist = "",
+                              const string &album = "");
 
 private:
-    spdlog::logger* logger;
+    spdlog::logger *logger;
     string clientId;
     string clientSecret;
     string accessToken;

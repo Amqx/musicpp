@@ -17,13 +17,13 @@ string urlEncode(const string &value, spdlog::logger *logger) {
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize CURL for urlEncode.");
+            logger->warn("Failed to initialize CURL for urlEncode.");
         }
         return "";
     }
     char *output = curl_easy_escape(curl, value.c_str(), value.length());
     string encoded = output ? output : "";
-        curl_free(output);
+    curl_free(output);
     curl_easy_cleanup(curl);
     return encoded;
 }

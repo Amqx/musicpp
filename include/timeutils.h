@@ -8,7 +8,6 @@
 #include <string>
 
 
-
 constexpr uint64_t INVALID_TIME = std::numeric_limits<uint64_t>::max();
 
 std::wstring FormatTimestamp(uint64_t seconds);

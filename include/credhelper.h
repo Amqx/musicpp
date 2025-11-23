@@ -11,7 +11,8 @@
 
 inline void CheckError(BOOL result, const std::wstring &task, spdlog::logger *logger = nullptr);
 
-void WriteGenericCredential(const std::wstring &targetName, const std::wstring &secret, spdlog::logger *logger = nullptr);
+void WriteGenericCredential(const std::wstring &targetName, const std::wstring &secret,
+                            spdlog::logger *logger = nullptr);
 
 std::wstring ReadGenericCredential(const std::wstring &targetName, spdlog::logger *logger = nullptr);
 

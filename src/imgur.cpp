@@ -21,12 +21,12 @@ using json = nlohmann::json;
 
 ImgurAPI::ImgurAPI(const string &apikey, spdlog::logger *logger) {
     clientID = apikey;
-    this -> logger = logger;
+    this->logger = logger;
 }
 
 ImgurAPI::~ImgurAPI() {
     if (logger) {
-        logger -> info("ImgurAPI Killed");
+        logger->info("ImgurAPI Killed");
     }
 }
 
@@ -36,7 +36,7 @@ string ImgurAPI::uploadImage(const IRandomAccessStreamReference &streamRef) cons
     vector<uint8_t> imageData(size);
 
     if (logger) {
-        logger -> info("Performing Imgur upload with size: {} kB", size/1024);
+        logger->info("Performing Imgur upload with size: {} kB", size / 1024);
     }
 
     DataReader reader(stream);
@@ -47,7 +47,7 @@ string ImgurAPI::uploadImage(const IRandomAccessStreamReference &streamRef) cons
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize CURL for Imgur upload.");
+            logger->warn("Failed to initialize CURL for Imgur upload.");
         }
         return "default";
     }
@@ -80,7 +80,7 @@ string ImgurAPI::uploadImage(const IRandomAccessStreamReference &streamRef) cons
 
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to upload image to Imgur: {}", curl_easy_strerror(res));
+            logger->warn("Failed to upload image to Imgur: {}", curl_easy_strerror(res));
         }
         return "default";
     }
@@ -99,18 +99,18 @@ string ImgurAPI::uploadImage(const IRandomAccessStreamReference &streamRef) cons
         }
 
         if (logger) {
-            logger -> warn("Imgur upload failed, success flag false.");
+            logger->warn("Imgur upload failed, success flag false.");
         }
 
         return "default";
     } catch (json::parse_error &e) {
         if (logger) {
-            logger -> warn("JSON parse error in Imgur uploadImage: {}", e.what());
+            logger->warn("JSON parse error in Imgur uploadImage: {}", e.what());
         }
         return "default";
     } catch (exception &e) {
         if (logger) {
-            logger -> warn("Other error in Imgur uploadImage: {}", e.what());
+            logger->warn("Other error in Imgur uploadImage: {}", e.what());
         }
         return "default";
     }

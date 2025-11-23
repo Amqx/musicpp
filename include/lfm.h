@@ -16,8 +16,7 @@ namespace spdlog {
 
 class lfm {
 public:
-
-    lfm(const std::string& apikey, const std::string& apisecret, spdlog::logger* logger = nullptr);
+    lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger *logger = nullptr);
 
     ~lfm();
 
@@ -28,9 +27,11 @@ public:
     // Does not require auth
     std::string searchTracks(const std::string &title, const std::string &artist) const;
 
-    bool updateNowPlaying(const std::string &title, const std::string &artist, const std::string &album, const time_t& duration) const;
+    bool updateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
+                          const time_t &duration) const;
 
-    bool scrobble(const std::string &title, const std::string &artist, const std::string &album, const time_t& start) const;
+    bool scrobble(const std::string &title, const std::string &artist, const std::string &album,
+                  const time_t &start) const;
 
 private:
     spdlog::logger *logger;
@@ -47,8 +48,7 @@ private:
 
     bool authTestSession(const std::string &testKey) const;
 
-    bool authGetSession(const std::string& token);
-
+    bool authGetSession(const std::string &token);
 };
 
 

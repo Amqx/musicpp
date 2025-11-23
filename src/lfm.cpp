@@ -38,7 +38,7 @@ lfm::lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger
 
     if (!session.empty() && authTestSession(session)) {
         if (logger) {
-            logger -> info("Successfully verified with LastFM using saved session key");
+            logger->info("Successfully verified with LastFM using saved session key");
         }
         sessionKey = session;
         enabled = true;
@@ -49,18 +49,20 @@ lfm::lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger
     string token = authRequestToken();
     if (token.empty()) {
         wcout << L"Failed to get token! LastFM will not function." << endl;
-        wcout << L"This error is most likely due to an incorrect API Key and Secret. Please check the logs for more info" << endl;
+        wcout <<
+                L"This error is most likely due to an incorrect API Key and Secret. Please check the logs for more info"
+                << endl;
         wcout << L"Press Enter or ESC to confirm: " << endl;
         while (!userExit());
     }
     wcout << L"Go to the following link to authorize LastFM:\n" << L"https://www.last.fm/api/auth/?api_key=" +
-        wstring(convertToWString(apikey)) + L"&token=" + convertToWString(token) << endl;
+            wstring(convertToWString(apikey)) + L"&token=" + convertToWString(token) << endl;
     wcout << L"\nThis program checks for success every 15 seconds.";
     wcout << L"You can press Enter or ESC at any time to cancel." << endl;
     time_t timer = 0;
     std::atomic cancelled{false};
 
-    jthread watcher([&](const std::stop_token &st){
+    jthread watcher([&](const std::stop_token &st) {
         while (!st.stop_requested()) {
             if (userExit()) {
                 cancelled = true;
@@ -96,7 +98,7 @@ std::string lfm::authRequestToken() {
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize CURL for LastFM authentication");
+            logger->warn("Failed to initialize CURL for LastFM authentication");
         }
         return "";
     }
@@ -113,7 +115,7 @@ std::string lfm::authRequestToken() {
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to request LastFM token: {}", curl_easy_strerror(res));
+            logger->warn("Failed to request LastFM token: {}", curl_easy_strerror(res));
         }
         return "";
     }
@@ -122,7 +124,7 @@ std::string lfm::authRequestToken() {
         json j = json::parse(readBuffer);
         if (!j.contains("token")) {
             if (logger) {
-                logger -> warn("Failed to retrieve auth token");
+                logger->warn("Failed to retrieve auth token");
             }
             return "";
         }
@@ -131,12 +133,12 @@ std::string lfm::authRequestToken() {
         return j["token"];
     } catch (json::parse_error &e) {
         if (logger) {
-            logger -> warn("JSON parse error in LastFM token request: {}", e.what());
+            logger->warn("JSON parse error in LastFM token request: {}", e.what());
         }
         return "";
     } catch (exception &e) {
         if (logger) {
-            logger -> warn("Other error in LastFM token request: {}", e.what());
+            logger->warn("Other error in LastFM token request: {}", e.what());
         }
         return "";
     }
@@ -153,7 +155,7 @@ bool lfm::authTestSession(const std::string &testKey) const {
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize curl for LastFM session test");
+            logger->warn("Failed to initialize curl for LastFM session test");
         }
         return false;
     }
@@ -170,7 +172,7 @@ bool lfm::authTestSession(const std::string &testKey) const {
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform LastFM session test");
+            logger->warn("Failed to perform LastFM session test");
         }
         return false;
     }
@@ -181,12 +183,12 @@ bool lfm::authTestSession(const std::string &testKey) const {
         return false;
     } catch (json::parse_error &e) {
         if (logger) {
-            logger -> warn("JSON parse error in LastFM session test: {}", e.what());
+            logger->warn("JSON parse error in LastFM session test: {}", e.what());
         }
         return false;
     } catch (exception &e) {
         if (logger) {
-            logger -> warn("Other error in LastFM session test: {}", e.what());
+            logger->warn("Other error in LastFM session test: {}", e.what());
         }
         return false;
     }
@@ -203,7 +205,7 @@ bool lfm::authGetSession(const std::string &token) {
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize curl for LastFM session get");
+            logger->warn("Failed to initialize curl for LastFM session get");
         }
         return false;
     }
@@ -220,7 +222,7 @@ bool lfm::authGetSession(const std::string &token) {
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform LastFM session get");
+            logger->warn("Failed to perform LastFM session get");
         }
         return false;
     }
@@ -234,7 +236,7 @@ bool lfm::authGetSession(const std::string &token) {
             enabled = true;
             WriteGenericCredential(L"lastfm_sessionkey", wstring(convertToWString(sessionKey)));
             if (logger) {
-                logger -> info("Successfully grabbed new LastFM SessionKey");
+                logger->info("Successfully grabbed new LastFM SessionKey");
                 wcout << L"Grabbed new LastFM session key" << endl;
             }
             return true;
@@ -242,26 +244,25 @@ bool lfm::authGetSession(const std::string &token) {
         return false;
     } catch (json::parse_error &e) {
         if (logger) {
-            logger -> warn("JSON parse error in LastFM session get: {}", e.what());
+            logger->warn("JSON parse error in LastFM session get: {}", e.what());
         }
         return false;
     } catch (exception &e) {
         if (logger) {
-            logger -> warn("Other error in LastFM session get: {}", e.what());
+            logger->warn("Other error in LastFM session get: {}", e.what());
         }
         return false;
     }
-
 }
 
 string lfm::searchTracks(const std::string &title, const std::string &artist) const {
-
     string readBuffer;
 
-    string url = "https://ws.audioscrobbler.com/2.0/?method=track.search&track=" + urlEncode(title, logger) + "&artist=" + urlEncode(artist, logger) + "&limit=5&format=json";
+    string url = "https://ws.audioscrobbler.com/2.0/?method=track.search&track=" + urlEncode(title, logger) + "&artist="
+                 + urlEncode(artist, logger) + "&limit=5&format=json";
 
     if (logger) {
-        logger -> debug("Performing LastFM search with query: {}", url);
+        logger->debug("Performing LastFM search with query: {}", url);
     }
 
     url += "&api_key=" + apikey;
@@ -271,7 +272,7 @@ string lfm::searchTracks(const std::string &title, const std::string &artist) co
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize CURL for LastFM searchTracks");
+            logger->warn("Failed to initialize CURL for LastFM searchTracks");
         }
         return result;
     }
@@ -287,7 +288,7 @@ string lfm::searchTracks(const std::string &title, const std::string &artist) co
 
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform LastFM search: {}", curl_easy_strerror(res));
+            logger->warn("Failed to perform LastFM search: {}", curl_easy_strerror(res));
         }
         return result;
     }
@@ -306,13 +307,15 @@ string lfm::searchTracks(const std::string &title, const std::string &artist) co
         double titleSimilarity = -1;
         double artistSimilarity = -1;
 
-        if (trackName.length() > 5 && title.length() > 5 && (toLowerCase(title).find(toLowerCase(trackName)) != std::string::npos ||
-            toLowerCase(trackName).find(toLowerCase(title)) != std::string::npos)) {
+        if (trackName.length() > 5 && title.length() > 5 && (
+                toLowerCase(title).find(toLowerCase(trackName)) != std::string::npos ||
+                toLowerCase(trackName).find(toLowerCase(title)) != std::string::npos)) {
             titleSimilarity = 100.0;
         }
         if (artistName.length() > 5 && artist.length() > 5 && (toLowerCase(artist).find(toLowerCase(artistName)) !=
-            std::string::npos ||
-            toLowerCase(artistName).find(toLowerCase(artist)) != std::string::npos)) {
+                                                               std::string::npos ||
+                                                               toLowerCase(artistName).find(toLowerCase(artist)) !=
+                                                               std::string::npos)) {
             artistSimilarity = 100.0;
         }
 
@@ -331,26 +334,27 @@ string lfm::searchTracks(const std::string &title, const std::string &artist) co
             result = trackURL;
         } else {
             if (logger) {
-                logger -> warn("Found Last.fm results with title: {} and artist: {}, but missing URL", trackName, artistName);
+                logger->warn("Found Last.fm results with title: {} and artist: {}, but missing URL", trackName,
+                             artistName);
             }
         }
 
         return result;
     } catch (json::parse_error &e) {
         if (logger) {
-            logger -> warn("JSON parse error in LastFM searchTracks: {}", e.what());
+            logger->warn("JSON parse error in LastFM searchTracks: {}", e.what());
         }
         return result;
     } catch (exception &e) {
         if (logger) {
-            logger -> warn("Other error in LastFM searchTracks: {}", e.what());
+            logger->warn("Other error in LastFM searchTracks: {}", e.what());
         }
         return result;
     }
 }
 
-bool lfm::updateNowPlaying(const std::string &title, const std::string &artist, const std::string &album, const time_t& duration) const {
-
+bool lfm::updateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
+                           const time_t &duration) const {
     if (!enabled) return false;
     const string url = "https://ws.audioscrobbler.com/2.0/";
     string body;
@@ -358,28 +362,30 @@ bool lfm::updateNowPlaying(const std::string &title, const std::string &artist, 
     const string art = urlEncode(artist, logger);
     const string tit = urlEncode(title, logger);
     const string alb = urlEncode(cleanAlbumName(album), logger);
-    const string hash = md5("album" + cleanAlbumName(album) + "api_key" + apikey + "artist" + artist + "duration" + dur + "method" + "track.updateNowPlaying" + "sk" + sessionKey + "track" + title + apisecret);
+    const string hash = md5(
+        "album" + cleanAlbumName(album) + "api_key" + apikey + "artist" + artist + "duration" + dur + "method" +
+        "track.updateNowPlaying" + "sk" + sessionKey + "track" + title + apisecret);
     body += "method=track.updateNowPlaying";
     body += "&api_key=" + apikey;
-    body += "&artist="  + art;
-    body += "&track="   + tit;
-    body += "&album="   + alb;
+    body += "&artist=" + art;
+    body += "&track=" + tit;
+    body += "&album=" + alb;
     body += "&duration=" + dur;
-    body += "&sk="      + sessionKey;
+    body += "&sk=" + sessionKey;
     body += "&api_sig=" + hash;
-    if (logger) logger -> debug("Updating LastFM Now playing to: {} by {} on {}, with duration {}", tit, art, alb, dur);
+    if (logger) logger->debug("Updating LastFM Now playing to: {} by {} on {}, with duration {}", tit, art, alb, dur);
 
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize curl for LastFM update now playing");
+            logger->warn("Failed to initialize curl for LastFM update now playing");
         }
         return false;
     }
 
     string readBuffer;
 
-    curl_slist* headers = nullptr;
+    curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -397,54 +403,55 @@ bool lfm::updateNowPlaying(const std::string &title, const std::string &artist, 
 
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform LastFM update now playing");
+            logger->warn("Failed to perform LastFM update now playing");
         }
         return false;
     }
 
     if (readBuffer.find("lfm status=\"ok\"") != string::npos) {
-        if (logger) logger -> info("Successfully set new LastFM now playing");
+        if (logger) logger->info("Successfully set new LastFM now playing");
         return true;
     }
-    if (logger) logger -> warn("Failed to set new LastFM now playing: {}", readBuffer);
+    if (logger) logger->warn("Failed to set new LastFM now playing: {}", readBuffer);
     return false;
 }
 
 bool lfm::scrobble(const std::string &title, const std::string &artist, const std::string &album,
-    const time_t& start) const {
-
+                   const time_t &start) const {
     if (!enabled) return false;
 
     const string ts = to_string(start);
     const string art = urlEncode(artist, logger);
     const string tit = urlEncode(title, logger);
     const string alb = urlEncode(cleanAlbumName(album), logger);
-    const string hash = md5("album" + cleanAlbumName(album) + "api_key" + apikey + "artist" + artist + "method" + "track.scrobble" + "sk" + sessionKey + "timestamp" + ts + "track" + title + apisecret);
+    const string hash = md5(
+        "album" + cleanAlbumName(album) + "api_key" + apikey + "artist" + artist + "method" + "track.scrobble" + "sk" +
+        sessionKey + "timestamp" + ts + "track" + title + apisecret);
     const string url = "https://ws.audioscrobbler.com/2.0/";
 
     string body;
     body += "method=track.scrobble";
     body += "&api_key=" + apikey;
-    body += "&artist="  + art;
-    body += "&track="   + tit;
-    body += "&album="   + alb;
+    body += "&artist=" + art;
+    body += "&track=" + tit;
+    body += "&album=" + alb;
     body += "&timestamp=" + ts;
-    body += "&sk="      + sessionKey;
+    body += "&sk=" + sessionKey;
     body += "&api_sig=" + hash;
 
-    if (logger) logger -> debug("Scrobbling: {} by {} on {}, with start time {}", tit, art, alb, ts);
+    if (logger) logger->debug("Scrobbling: {} by {} on {}, with start time {}", tit, art, alb, ts);
 
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize curl for LastFM scrobble");
+            logger->warn("Failed to initialize curl for LastFM scrobble");
         }
         return false;
     }
 
     string readBuffer;
 
-    curl_slist* headers = nullptr;
+    curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -461,17 +468,14 @@ bool lfm::scrobble(const std::string &title, const std::string &artist, const st
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform scrobble");
+            logger->warn("Failed to perform scrobble");
         }
         return false;
     }
     if (readBuffer.find("lfm status=\"ok\"") != string::npos) {
-        if (logger) logger -> info("Successfully scrobbled track");
+        if (logger) logger->info("Successfully scrobbled track");
         return true;
     }
-    if (logger) logger -> warn("Failed to scrobble track: {}", readBuffer);
+    if (logger) logger->warn("Failed to scrobble track: {}", readBuffer);
     return false;
 }
-
-
-

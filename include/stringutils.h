@@ -21,10 +21,10 @@ std::string discord_bounds(const std::wstring &wstr, const std::string &fallback
 
 std::string sanitizeKeys(std::string input);
 
-std::string md5(const std::string& input);
+std::string md5(const std::string &input);
 
-std::string cleanAlbumName(const std::string& input);
+std::string cleanAlbumName(const std::string &input);
 
-const char* b(bool v);
+const char *b(bool v);
 
 #endif //MUSICPP_STRINGUTILS_H

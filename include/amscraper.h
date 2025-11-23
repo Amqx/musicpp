@@ -14,11 +14,12 @@ namespace spdlog {
 
 class amscraper {
 public:
-    explicit amscraper(const std::string &region, spdlog::logger *logger=nullptr);
+    explicit amscraper(const std::string &region, spdlog::logger *logger = nullptr);
 
     ~amscraper();
 
-    searchResult searchTracks(const std::string& title, const std::string& artist, const std::string& album) const;
+    searchResult searchTracks(const std::string &title, const std::string &artist, const std::string &album) const;
+
 private:
     std::string region;
     spdlog::logger *logger;

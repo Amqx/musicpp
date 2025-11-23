@@ -29,6 +29,7 @@
 #include <lfm.h>
 
 using namespace std;
+
 namespace {
     struct AppContext {
         std::unique_ptr<leveldb::DB> db;
@@ -53,6 +54,7 @@ namespace {
 
         wstring lastTip;
     };
+
     constexpr int INTERVAL = 5;
     constexpr UINT WM_TRAYICON = WM_APP + 1;
     constexpr UINT ID_TRAY_EXIT = 1001;
@@ -86,17 +88,18 @@ namespace {
         localtime_s(&tm, &t);
         char buf[64];
         snprintf(buf, sizeof(buf), "musicpp_%04d-%02d-%02d_%02d-%02d-%02d.log",
-            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec
+                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec
         );
         return string(buf);
     }
-    void pruneLogs(const filesystem::path& folder) {
+
+    void pruneLogs(const filesystem::path &folder) {
         int maxFiles = 10;
         std::vector<filesystem::directory_entry> files;
-        for (auto& entry : filesystem::directory_iterator(folder)) {
+        for (auto &entry: filesystem::directory_iterator(folder)) {
             if (entry.is_regular_file()) files.push_back(entry);
         }
-        ranges::sort(files, [](auto& a, auto& b) {
+        ranges::sort(files, [](auto &a, auto &b) {
             return a.last_write_time() > b.last_write_time();
         });
 
@@ -110,9 +113,11 @@ namespace {
             }
         }
     }
+
     bool isValidRegion(const std::string &region) {
         return kValidRegions.contains(region);
     }
+
     void printRegionList() {
         wcout << L"\nAvailable Apple Music regions (country codes):" << endl;
         int count = 0;
@@ -128,6 +133,7 @@ namespace {
         }
         wcout << endl;
     }
+
     void saveRegion(const AppContext &ctx, const std::string &region) {
         if (!ctx.db) return;
         const leveldb::Status status = ctx.db->Put(leveldb::WriteOptions(), kRegionDbKey, region);
@@ -137,6 +143,7 @@ namespace {
             if (ctx.logger) ctx.logger->info("Set region to {}", region);
         }
     }
+
     string loadRegion(const AppContext &ctx) {
         if (!ctx.db) return "";
         string region;
@@ -146,6 +153,7 @@ namespace {
         }
         return region;
     }
+
     string getRegion() {
         wstring input;
         while (true) {
@@ -166,6 +174,7 @@ namespace {
             printRegionList();
         }
     }
+
     string ensureRegion(const AppContext &ctx) {
         string region = toLowerCase(loadRegion(ctx));
         if (region.empty()) {
@@ -174,6 +183,7 @@ namespace {
         }
         return region;
     }
+
     bool InitializeDatabase(AppContext &ctx) {
         PWSTR path = nullptr;
 
@@ -186,8 +196,8 @@ namespace {
         wcout << L"Configuration files: " << path << L'\n' << endl;
 
         const filesystem::path basePath(path);
-        const filesystem::path dbPath = basePath / "musicpp" /"song_db";
-        const filesystem::path logPath = basePath  / "musicpp" / "logs" ;
+        const filesystem::path dbPath = basePath / "musicpp" / "song_db";
+        const filesystem::path logPath = basePath / "musicpp" / "logs";
         CoTaskMemFree(path);
 
         std::error_code ec1, ec2;
@@ -207,23 +217,23 @@ namespace {
             pruneLogs(logPath);
             const string name = makeLogName();
             auto logger = spdlog::basic_logger_mt("MusicPP Logger", (logPath / name).string());
-    #ifdef LOG_LEVEL_DEBUG
+#ifdef LOG_LEVEL_DEBUG
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
-    #elif defined(LOG_LEVEL_INFO)
+#elif defined(LOG_LEVEL_INFO)
             spdlog::set_level(spdlog::level::info);
             spdlog::flush_every(std::chrono::seconds(15));
-    #else
+#else
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
-    #endif
+#endif
             spdlog::set_pattern("(%H:%M:%S %z, [%8l]) Thread %t: %v");
             ctx.logger = logger;
         }
 
         if (ctx.logger) {
-            ctx.logger -> info("Logger initialized at path: {}", logPath.string());
-            ctx.logger -> info("MusicPP starting up...");
+            ctx.logger->info("Logger initialized at path: {}", logPath.string());
+            ctx.logger->info("MusicPP starting up...");
         }
 
         leveldb::DB *tempDB = nullptr;
@@ -236,15 +246,16 @@ namespace {
 
         if (status.ok()) {
             ctx.db.reset(tempDB);
-            if (ctx.logger) ctx.logger -> info("Database initialized at path: {}", dbPath.string());
+            if (ctx.logger) ctx.logger->info("Database initialized at path: {}", dbPath.string());
             return true;
         }
 
         wcout << L"Fatal: Could not initialize database!" << endl;
-        if (ctx.logger) ctx.logger -> error("Could not initialize database: {}", status.ToString());
+        if (ctx.logger) ctx.logger->error("Could not initialize database: {}", status.ToString());
 
         return false;
     }
+
     bool RunConfigurationMode(const AppContext &ctx, string &region) {
         wcout << L"------------------------------------------------\n" << endl;
 
@@ -288,7 +299,7 @@ namespace {
             wcin >> input;
 
             if (input == L"1") {
-                if (ctx.logger) ctx.logger -> info("User initiated API key reset.");
+                if (ctx.logger) ctx.logger->info("User initiated API key reset.");
                 wcout << L"Deleted all keys." << endl;
 
                 return true; // forceReset = true
@@ -307,12 +318,13 @@ namespace {
                 }
             }
         } else {
-            if (ctx.logger) ctx.logger -> info("Auto-Start mode, no user interaction");
+            if (ctx.logger) ctx.logger->info("Auto-Start mode, no user interaction");
             wcout << L"\n\n[Auto-Start] No interaction detected. Loading keys..." << endl;
         }
 
         return false; // forceReset = false
     }
+
     void LoadCredentials(AppContext &ctx, bool forceReset, const string &region) {
         wcout << L"\nChecking API Keys..." << endl;
 
@@ -327,40 +339,44 @@ namespace {
         wstring i_cid = EnsureCredential(L"musicpp/imgur_client_id", L"Imgur Client ID",
                                          L"https://api.imgur.com/oauth2/addclient", forceReset, ctx.logger.get());
 
-        wstring lfm_key = EnsureCredential(L"musicpp/lastfm_api_key", L"LastFM API Key", L"https://www.last.fm/api/account/create",
-            forceReset, ctx.logger.get());
+        wstring lfm_key = EnsureCredential(L"musicpp/lastfm_api_key", L"LastFM API Key",
+                                           L"https://www.last.fm/api/account/create",
+                                           forceReset, ctx.logger.get());
 
-        wstring lfm_secret = EnsureCredential(L"musicpp/lastfm_secret", L"LastFM Secret", L"https://www.last.fm/api/account/create", forceReset, ctx.logger.get());
+        wstring lfm_secret = EnsureCredential(L"musicpp/lastfm_secret", L"LastFM Secret",
+                                              L"https://www.last.fm/api/account/create", forceReset, ctx.logger.get());
 
         wcout << "\nAll APIKeys found" << endl;
         if (ctx.logger) {
-            ctx.logger -> info("All API keys loaded successfully");
+            ctx.logger->info("All API keys loaded successfully");
         }
 
         // Initialize API and Player objects
         wcout << L"Apple Music region: " << region.c_str() << endl;
         ctx.scraper = std::make_unique<amscraper>(region, ctx.logger.get());
-        if (ctx.logger) ctx.logger -> info("AMScraper initialized with region {}", region);
+        if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
         ctx.lastfm = std::make_unique<lfm>(convertWString(lfm_key), convertWString(lfm_secret), ctx.logger.get());
         if (ctx.logger) {
-            ctx.logger -> info("LastFM initialized");
+            ctx.logger->info("LastFM initialized");
         }
 
         ctx.spotify = std::make_unique<SpotifyAPI>(convertWString(s_cid), convertWString(s_sec), ctx.logger.get());
         if (ctx.logger) {
-            ctx.logger -> info("SpotifyAPI initialized");
+            ctx.logger->info("SpotifyAPI initialized");
         }
 
         ctx.imgur = std::make_unique<ImgurAPI>(convertWString(i_cid), ctx.logger.get());
-        if (ctx.logger) ctx.logger -> info("ImgurAPI initialized");
+        if (ctx.logger) ctx.logger->info("ImgurAPI initialized");
 
-        ctx.player = std::make_unique<mediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(), ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
-        if (ctx.logger) ctx.logger -> info("mediaPlayer initialized");
+        ctx.player = std::make_unique<mediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(),
+                                                   ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
+        if (ctx.logger) ctx.logger->info("mediaPlayer initialized");
 
         ctx.discord = std::make_unique<discordrp>(ctx.player.get(), 1358389458956976128, ctx.logger.get());
-        if (ctx.logger) ctx.logger -> info("discordrp initialized");
+        if (ctx.logger) ctx.logger->info("discordrp initialized");
     }
+
     void UpdateTrayTooltip(AppContext *ctx) {
         if (ctx->nid.cbSize == 0) return;
 
@@ -395,7 +411,7 @@ namespace {
 
         ctx->lastTip = tip;
 
-        if (ctx -> logger) ctx->logger->debug("Updating tray tooltip to: {}", convertWString(tip));
+        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: {}", convertWString(tip));
 
         lstrcpynW(ctx->nid.szTip, tip.c_str(), ARRAYSIZE(ctx->nid.szTip));
 
@@ -403,6 +419,7 @@ namespace {
 
         Shell_NotifyIcon(NIM_MODIFY, &ctx->nid);
     }
+
     LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         auto *ctx = reinterpret_cast<AppContext *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
@@ -444,8 +461,9 @@ namespace {
 
                 SetTimer(hWnd, DATA_TIMER_ID, DATA_TIMER_INTERVAL, nullptr);
 
-                if (ctx->logger) ctx -> logger -> debug("Timer started: Data ({}) ms",
-                                                      DATA_TIMER_INTERVAL);
+                if (ctx->logger)
+                    ctx->logger->debug("Timer started: Data ({}) ms",
+                                       DATA_TIMER_INTERVAL);
                 return 0;
             }
 
@@ -487,7 +505,7 @@ namespace {
 
             case WM_COMMAND: {
                 if (LOWORD(wParam) == ID_TRAY_EXIT) {
-                    if (ctx -> logger) ctx->logger->info("User requested application exit via tray menu.");
+                    if (ctx->logger) ctx->logger->info("User requested application exit via tray menu.");
                     SendMessage(hWnd, WM_CLOSE, 0, 0);
                 }
 
@@ -497,14 +515,14 @@ namespace {
 
             case WM_TIMER: {
                 if (!ctx || !ctx->player || !ctx->discord) {
-                    if (ctx && ctx -> logger) ctx->logger->error("Timer triggered but AppContext/dependencies are null.");
+                    if (ctx && ctx->logger) ctx->logger->error("Timer triggered but AppContext/dependencies are null.");
                     return 0;
                 }
 
                 ctx->player->getInfo();
                 ctx->discord->update();
                 UpdateTrayTooltip(ctx);
-                if (ctx -> logger) ctx->logger->debug("Data timer update cycle completed.");
+                if (ctx->logger) ctx->logger->debug("Data timer update cycle completed.");
                 return 0;
             }
 
@@ -520,7 +538,7 @@ namespace {
                     if (ctx->nid.hIcon) {
                         DestroyIcon(ctx->nid.hIcon);
                     }
-                    if (ctx -> logger) ctx->logger->info("Timers and icon cleaned up");
+                    if (ctx->logger) ctx->logger->info("Timers and icon cleaned up");
                 }
 
                 DestroyWindow(hWnd);
@@ -542,7 +560,6 @@ namespace {
 } // Helpers
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-
     SetupConsole();
 
     AppContext ctx;
@@ -607,4 +624,3 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     return static_cast<int>(msg.wParam);
 }
-

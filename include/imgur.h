@@ -28,7 +28,7 @@ public:
 private:
     string clientID;
 
-    spdlog::logger* logger;
+    spdlog::logger *logger;
 };
 
 

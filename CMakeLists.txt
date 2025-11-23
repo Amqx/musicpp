@@ -63,17 +63,3 @@ add_custom_command(TARGET musicpp POST_BUILD
         "${DISCORD_SHARED_LIB}"
         $<TARGET_FILE_DIR:musicpp>;
 )
-
-
-
-add_executable(lfmtest
-        src/lfm.cpp
-        testfiles/lfmtest.cpp
-        src/utils.cpp
-        src/timeutils.cpp
-        src/stringutils.cpp
-        src/credhelper.cpp
-        src/amscraper.cpp
-        src/spotify.cpp
-)
-target_link_libraries(lfmtest PRIVATE CURL::libcurl windowsapp nlohmann_json::nlohmann_json Advapi32 spdlog::spdlog LibXml2::LibXml2)

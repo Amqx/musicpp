@@ -47,7 +47,8 @@ namespace {
         return trimmed;
     }
 
-    xmlNodePtr findDescendantWithAttr(xmlNodePtr node, const char *tagName, const char *attrName, const char *attrValue) {
+    xmlNodePtr findDescendantWithAttr(xmlNodePtr node, const char *tagName, const char *attrName,
+                                      const char *attrValue) {
         for (xmlNodePtr current = node; current; current = current->next) {
             if (current->type == XML_ELEMENT_NODE) {
                 if (!tagName || xmlStrcasecmp(current->name, BAD_CAST tagName) == 0) {
@@ -95,8 +96,10 @@ namespace {
 
         if (foundTitle.empty() || foundArtist.empty()) return false;
 
-        bool titleMatch = FuzzyMatch(foundTitle, targetTitle) || foundTitle.find(normalize(targetTitle)) != std::string::npos;
-        bool artistMatch = FuzzyMatch(foundArtist, targetArtist) || foundArtist.find(normalize(targetArtist)) != std::string::npos;
+        bool titleMatch = FuzzyMatch(foundTitle, targetTitle) || foundTitle.find(normalize(targetTitle)) !=
+                          std::string::npos;
+        bool artistMatch = FuzzyMatch(foundArtist, targetArtist) || foundArtist.find(normalize(targetArtist)) !=
+                           std::string::npos;
 
         return titleMatch && artistMatch;
     }
@@ -119,22 +122,23 @@ namespace {
 } // Helpers
 
 amscraper::amscraper(const std::string &region, spdlog::logger *logger) {
-    this -> region = region;
-    this -> logger = logger;
+    this->region = region;
+    this->logger = logger;
 }
 
 amscraper::~amscraper() {
     if (logger) {
-        logger -> info("amScraper Killed");
+        logger->info("amScraper Killed");
     }
 }
 
-searchResult amscraper::searchTracks(const std::string &title, const std::string &artist, const std::string &album) const {
-
-    const std::string url = "https://music.apple.com/" + region + "/search?term=" + urlEncode(title + " " + album + " " + artist, logger);
+searchResult amscraper::searchTracks(const std::string &title, const std::string &artist,
+                                     const std::string &album) const {
+    const std::string url = "https://music.apple.com/" + region + "/search?term=" + urlEncode(
+                                title + " " + album + " " + artist, logger);
 
     if (logger) {
-        logger -> debug("Performing Apple Music search with query {}", url);
+        logger->debug("Performing Apple Music search with query {}", url);
     }
 
     searchResult results = {"", ""};
@@ -142,7 +146,7 @@ searchResult amscraper::searchTracks(const std::string &title, const std::string
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger) {
-            logger -> warn("Failed to initialize CURL for Apple Music searchTracks.");
+            logger->warn("Failed to initialize CURL for Apple Music searchTracks.");
         }
         return results;
     }
@@ -166,12 +170,13 @@ searchResult amscraper::searchTracks(const std::string &title, const std::string
 
     if (res != CURLE_OK) {
         if (logger) {
-            logger -> warn("Failed to perform Apple Music search: {}", curl_easy_strerror(res));
+            logger->warn("Failed to perform Apple Music search: {}", curl_easy_strerror(res));
         }
         return results;
     }
 
-    htmlDocPtr doc = htmlReadMemory(readBuffer.c_str(), static_cast<int>(readBuffer.size()), nullptr, nullptr, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    htmlDocPtr doc = htmlReadMemory(readBuffer.c_str(), static_cast<int>(readBuffer.size()), nullptr, nullptr,
+                                    HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
     if (!doc) {
         if (logger) logger->warn("Failed to parse Apple Music HTML");
         return results;
@@ -180,7 +185,6 @@ searchResult amscraper::searchTracks(const std::string &title, const std::string
     if (xmlNodePtr root = xmlDocGetRootElement(doc)) {
         if (xmlNodePtr searchRoot = findDivWithClass(root, "desktop-search-page")) {
             if (xmlNodePtr liNode = findMatchingListItem(searchRoot, title, artist)) {
-
                 xmlNodePtr anchorNode = findDescendantWithAttr(liNode, "a", "data-testid", "click-action");
                 results.url = getAttribute(anchorNode, "href");
 
@@ -203,7 +207,6 @@ searchResult amscraper::searchTracks(const std::string &title, const std::string
                         }
                     }
                 }
-
             } else {
                 if (logger) logger->debug("No matching track found in Apple Music HTML list");
             }

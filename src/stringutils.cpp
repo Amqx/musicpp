@@ -61,7 +61,7 @@ wstring convertToWString(const string &str) {
     }
 
     int required_size = MultiByteToWideChar(CP_UTF8, 0, str.data(),
-        static_cast<int>(str.length()), nullptr, 0);
+                                            static_cast<int>(str.length()), nullptr, 0);
 
     if (required_size <= 0) {
         return L"";
@@ -70,7 +70,7 @@ wstring convertToWString(const string &str) {
     wstring wstr(required_size, L'\0');
 
     MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.length()),
-        &wstr[0], required_size);
+                        &wstr[0], required_size);
 
     return wstr;
 }
@@ -136,8 +136,8 @@ std::string discord_bounds(const wstring &wstr, const string &fallback) {
         } while (isspace(*r));
 
         string out;
-        if (r>=l) {
-            out.assign (l, r+1);
+        if (r >= l) {
+            out.assign(l, r + 1);
         }
         if (out.size() > 128) {
             out.resize(128);
@@ -156,7 +156,7 @@ std::string sanitizeKeys(std::string input) {
     return input;
 }
 
-std::string md5(const std::string& input) {
+std::string md5(const std::string &input) {
     HCRYPTPROV hProv = 0;
     HCRYPTHASH hHash = 0;
     BYTE digest[16];
@@ -168,7 +168,7 @@ std::string md5(const std::string& input) {
         return "";
     }
 
-    CryptHashData(hHash, reinterpret_cast<const BYTE*>(input.data()), input.size(), 0);
+    CryptHashData(hHash, reinterpret_cast<const BYTE *>(input.data()), input.size(), 0);
     CryptGetHashParam(hHash, HP_HASHVAL, digest, &digestLen, 0);
     CryptDestroyHash(hHash);
     CryptReleaseContext(hProv, 0);
@@ -177,12 +177,12 @@ std::string md5(const std::string& input) {
     std::string out;
     out.reserve(32);
 
-    for (const unsigned char b : digest) {
-        out.push_back(hex[b>>4]);
+    for (const unsigned char b: digest) {
+        out.push_back(hex[b >> 4]);
         out.push_back(hex[b & 0x0F]);
     }
 
     return out;
 }
 
-const char* b(const bool v) { return v ? "1" : "0"; }
+const char *b(const bool v) { return v ? "1" : "0"; }

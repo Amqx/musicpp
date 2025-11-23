@@ -6,7 +6,7 @@
 #include <stringutils.h>
 
 
-discordrp::discordrp(mediaPlayer *player, const uint64_t& apikey, spdlog::logger* logger) {
+discordrp::discordrp(mediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger) {
     this->appleMusic = player;
     this->clientID = apikey;
     running = true;
@@ -14,7 +14,7 @@ discordrp::discordrp(mediaPlayer *player, const uint64_t& apikey, spdlog::logger
     if (logger) {
         logger->debug("Refresh thread started for discordrp");
     }
-    this -> logger = logger;
+    this->logger = logger;
     client->SetApplicationId(clientID);
     client->Connect();
     if (logger) {
@@ -26,8 +26,8 @@ discordrp::~discordrp() {
     running = false;
     client->Disconnect();
     if (refreshThread.joinable()) refreshThread.join();
-    if (this -> logger) {
-        logger -> info("discordrp Killed");
+    if (this->logger) {
+        logger->info("discordrp Killed");
     }
 }
 
@@ -35,9 +35,9 @@ void discordrp::update() const {
     if (!appleMusic->getTitle().empty() && !appleMusic->getArtist().empty() && !appleMusic->getAlbum().empty()) {
         discordpp::Activity activity;
 
-        const string title = discord_bounds(appleMusic -> getTitle(), "Unknown Song");
-        const string artist = discord_bounds(appleMusic -> getArtist(), "Unknown Artist");
-        const string album = discord_bounds(appleMusic -> getAlbum(), "Unknown Album");
+        const string title = discord_bounds(appleMusic->getTitle(), "Unknown Song");
+        const string artist = discord_bounds(appleMusic->getArtist(), "Unknown Artist");
+        const string album = discord_bounds(appleMusic->getAlbum(), "Unknown Album");
         const string imglink = convertWString(appleMusic->getImage());
         const string amlink = convertWString(appleMusic->getAMLink());
         const string LFMlink = convertWString(appleMusic->getLastFMLink());
@@ -50,7 +50,8 @@ void discordrp::update() const {
         activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::Details);
         activity.SetType(discordpp::ActivityTypes::Listening);
         if (logger) {
-            logger -> debug("Activity (name, details, state): '{}' '{}' '{}'", artist + convertWString(L" \uf3b4"), title, artist);
+            logger->debug("Activity (name, details, state): '{}' '{}' '{}'", artist + convertWString(L" \uf3b4"), title,
+                          artist);
         }
 
         // Images
@@ -61,7 +62,7 @@ void discordrp::update() const {
         }
         assets.SetLargeText(album);
         if (logger) {
-            logger -> debug("Assets (large image, large text): '{}' '{}'", imglink, album);
+            logger->debug("Assets (large image, large text): '{}' '{}'", imglink, album);
         }
 
         // Time
@@ -71,7 +72,7 @@ void discordrp::update() const {
             timestamps.SetEnd(appleMusic->getEndTS());
             activity.SetTimestamps(timestamps);
             if (logger) {
-                logger -> debug("Timestamps (start, end): '{}' '{}'", appleMusic->getStartTS(), appleMusic->getEndTS());
+                logger->debug("Timestamps (start, end): '{}' '{}'", appleMusic->getStartTS(), appleMusic->getEndTS());
             }
         } else {
             timestamps.SetStart(appleMusic->getPauseTimer());
@@ -79,7 +80,7 @@ void discordrp::update() const {
             assets.SetSmallImage("pause");
             assets.SetSmallText("Paused");
             if (logger) {
-                logger -> debug("Timestamps (paused at): '{}'", appleMusic->getPauseTimer());
+                logger->debug("Timestamps (paused at): '{}'", appleMusic->getPauseTimer());
             }
         }
 
@@ -91,9 +92,9 @@ void discordrp::update() const {
             activity.AddButton(button1);
             if (logger) {
                 if (button1) {
-                    logger -> debug("Added Apple Music button with URL: '{}'", amlink);
+                    logger->debug("Added Apple Music button with URL: '{}'", amlink);
                 } else {
-                    logger -> debug("Invalid Apple Music button with URL: '{}'", amlink);
+                    logger->debug("Invalid Apple Music button with URL: '{}'", amlink);
                 }
             }
         }
@@ -105,19 +106,20 @@ void discordrp::update() const {
                 activity.AddButton(button2);
                 if (logger) {
                     if (button2) {
-                        logger -> debug("Added LastFM button with URL: '{}'", LFMlink);
+                        logger->debug("Added LastFM button with URL: '{}'", LFMlink);
                     } else {
-                        logger -> debug("Invalid LastFM button with URL: '{}'", LFMlink);
+                        logger->debug("Invalid LastFM button with URL: '{}'", LFMlink);
                     }
                 }
-            } else {button2.SetLabel("Spotify");
+            } else {
+                button2.SetLabel("Spotify");
                 button2.SetUrl(splink);
                 activity.AddButton(button2);
                 if (logger) {
                     if (button2) {
-                        logger -> debug("Added Spotify button with URL: '{}'", splink);
+                        logger->debug("Added Spotify button with URL: '{}'", splink);
                     } else {
-                        logger -> debug("Invalid Spotify button with URL: '{}'", splink);
+                        logger->debug("Invalid Spotify button with URL: '{}'", splink);
                     }
                 }
             }
@@ -128,10 +130,11 @@ void discordrp::update() const {
         }
 
         activity.SetAssets(assets);
-        client->UpdateRichPresence(activity, [logger = this ->logger](const discordpp::ClientResult &result) {
+        client->UpdateRichPresence(activity, [logger = this->logger](const discordpp::ClientResult &result) {
             if (!result.Successful()) {
                 if (logger) {
-                    logger -> error("Discord RPC update failed ({}): {}", static_cast<int>(result.Type()), result.Error());
+                    logger->error("Discord RPC update failed ({}): {}", static_cast<int>(result.Type()),
+                                  result.Error());
                 }
             }
         });
@@ -149,7 +152,7 @@ void discordrp::refreshLoop() const {
             discordpp::RunCallbacks();
         } catch (exception &e) {
             if (logger) {
-                logger -> warn("Error in discordrp refresh loop: {}", e.what());
+                logger->warn("Error in discordrp refresh loop: {}", e.what());
             }
         }
         this_thread::sleep_for(std::chrono::milliseconds(10));

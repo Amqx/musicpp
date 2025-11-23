@@ -15,7 +15,7 @@ using namespace std;
 
 class discordrp {
 public:
-    discordrp(mediaPlayer *player, const uint64_t& apikey, spdlog::logger* logger = nullptr);
+    discordrp(mediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger = nullptr);
 
     ~discordrp();
 
@@ -26,7 +26,7 @@ public:
     void update() const;
 
 private:
-    spdlog::logger* logger;
+    spdlog::logger *logger;
     atomic<bool> running{false};
     thread refreshThread;
     uint64_t clientID;

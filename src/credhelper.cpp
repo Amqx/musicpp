@@ -35,7 +35,7 @@ inline void CheckError(BOOL result, const std::wstring &task, spdlog::logger *lo
     if (!result) {
         DWORD err = GetLastError();
         if (logger) {
-            logger -> error("Failed to {}. Error code: {}", convertWString(task.c_str()), err);
+            logger->error("Failed to {}. Error code: {}", convertWString(task.c_str()), err);
         }
     }
 }

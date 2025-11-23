@@ -48,7 +48,8 @@ struct ArtworkLog {
 
 class mediaPlayer {
 public:
-    mediaPlayer(amscraper *scraper, SpotifyAPI *sapi, ImgurAPI *iapi, lfm *lastfm, leveldb::DB *database, spdlog::logger *logger = nullptr);
+    mediaPlayer(amscraper *scraper, SpotifyAPI *sapi, ImgurAPI *iapi, lfm *lastfm, leveldb::DB *database,
+                spdlog::logger *logger = nullptr);
 
     ~mediaPlayer();
 
@@ -110,7 +111,7 @@ private:
     SpotifyAPI *spotify_client;
     ImgurAPI *imgur_client;
     amscraper *scraper;
-    spdlog::logger* logger;
+    spdlog::logger *logger;
     lfm *lastfm_client;
 
     int scrobbleattempts = 0;
@@ -124,19 +125,39 @@ private:
     void findRunning();
 
     bool hasActiveSession() const;
-    void updatePlaybackState(const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackInfo& info);
-    void updateTimeline(const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties& info);
-    bool updateMetadata(const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties& properties);
-    void loadDBImage(const time_t& currTime, const string &songKey, ArtworkLog &logInfo);
-    void loadAMLink(const time_t& currTime, const string &songKey, ArtworkLog &logInfo);
-    void loadLastFMLink(const time_t& currTime, const string &songKey, ArtworkLog &logInfo);
-    void loadSpotifyLink(const time_t& currTime, const string &songKey, ArtworkLog &logInfo);
-    void fetchArtworkAM(const time_t& currTime, const string &songKey, const string &stitle, const string& sartist, const string& salbum, ArtworkLog& logInfo);
-    void fetchLastFMLink(const time_t& currTime, const string& songKey, const string &stitle, const string& sartist, ArtworkLog &logInfo);
-    void fetchArtworkSpotify(const time_t& currTime, const string &songKey, const string &stitle, const string& sartist, const string& salbum, ArtworkLog &logInfo);
-    void fetchArtworkImgur(const time_t& currTime, const string &songKey, const IRandomAccessStreamReference &thumb, ArtworkLog &logInfo);
+
+    void updatePlaybackState(
+        const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackInfo &info);
+
+    void updateTimeline(
+        const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties &info);
+
+    bool updateMetadata(
+        const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties &properties);
+
+    void loadDBImage(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+
+    void loadAMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+
+    void loadLastFMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+
+    void loadSpotifyLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+
+    void fetchArtworkAM(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
+                        const string &salbum, ArtworkLog &logInfo);
+
+    void fetchLastFMLink(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
+                         ArtworkLog &logInfo);
+
+    void fetchArtworkSpotify(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
+                             const string &salbum, ArtworkLog &logInfo);
+
+    void fetchArtworkImgur(const time_t &currTime, const string &songKey, const IRandomAccessStreamReference &thumb,
+                           ArtworkLog &logInfo);
+
     void clearNowPlaying();
-    void log_artwork(const ArtworkLog& a) const;
+
+    void log_artwork(const ArtworkLog &a) const;
 };
 
 
