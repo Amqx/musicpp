@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <vector>
 #include <algorithm>
+#include <wincrypt.h>
 
 using namespace std;
 
@@ -15,13 +16,13 @@ string convertWString(const wstring &wstr) {
     }
 
     const int required_size = WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags
-        wstr.data(), // lpWideCharStr: Pointer to wide string data
-        static_cast<int>(wstr.length()), // cchWideChar: Length of the wide string (excluding null)
-        nullptr, // lpMultiByteStr: Output buffer (NULL to get size)
-        0, // cbMultiByte: Output buffer size (0 to get size)
-        nullptr, nullptr // lpDefaultChar, lpUsedDefaultChar
+        CP_UTF8,
+        0,
+        wstr.data(),
+        static_cast<int>(wstr.length()),
+        nullptr,
+        0,
+        nullptr, nullptr
     );
 
     if (required_size <= 0) {
@@ -30,16 +31,48 @@ string convertWString(const wstring &wstr) {
     std::string narrow_str(required_size, '\0');
 
     WideCharToMultiByte(
-        CP_UTF8, // CodePage: Convert to UTF-8
-        0, // dwFlags
-        wstr.data(), // lpWideCharStr
-        static_cast<int>(wstr.length()), // cchWideChar
-        &narrow_str[0], // lpMultiByteStr: Use the internal buffer (C++11+)
-        required_size, // cbMultiByte: Size of the buffer
+        CP_UTF8,
+        0,
+        wstr.data(),
+        static_cast<int>(wstr.length()),
+        &narrow_str[0],
+        required_size,
         nullptr, nullptr
     );
 
     return narrow_str;
+}
+
+std::string cleanAlbumName(const std::string &input) {
+    auto pos = input.rfind(" — Single");
+
+    if (pos == string::npos) {
+        pos = input.rfind(" — EP");
+        if (pos == string::npos) {
+            return input;
+        }
+    }
+    return input.substr(0, pos);
+}
+
+wstring convertToWString(const string &str) {
+    if (str.empty()) {
+        return L"";
+    }
+
+    int required_size = MultiByteToWideChar(CP_UTF8, 0, str.data(),
+        static_cast<int>(str.length()), nullptr, 0);
+
+    if (required_size <= 0) {
+        return L"";
+    }
+
+    wstring wstr(required_size, L'\0');
+
+    MultiByteToWideChar(CP_UTF8, 0, str.data(), static_cast<int>(str.length()),
+        &wstr[0], required_size);
+
+    return wstr;
 }
 
 int levenshteinDistance(const string &s1, const string &s2) {
@@ -119,6 +152,37 @@ std::string discord_bounds(const wstring &wstr, const string &fallback) {
 }
 
 std::string sanitizeKeys(std::string input) {
-    std::replace(input.begin(), input.end(), '|', '-');
+    ranges::replace(input, '|', '-');
     return input;
 }
+
+std::string md5(const std::string& input) {
+    HCRYPTPROV hProv = 0;
+    HCRYPTHASH hHash = 0;
+    BYTE digest[16];
+    DWORD digestLen = 16;
+
+    if (!CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT)) return "";
+    if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
+        CryptReleaseContext(hProv, 0);
+        return "";
+    }
+
+    CryptHashData(hHash, reinterpret_cast<const BYTE*>(input.data()), input.size(), 0);
+    CryptGetHashParam(hHash, HP_HASHVAL, digest, &digestLen, 0);
+    CryptDestroyHash(hHash);
+    CryptReleaseContext(hProv, 0);
+
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(32);
+
+    for (const unsigned char b : digest) {
+        out.push_back(hex[b>>4]);
+        out.push_back(hex[b & 0x0F]);
+    }
+
+    return out;
+}
+
+const char* b(const bool v) { return v ? "1" : "0"; }

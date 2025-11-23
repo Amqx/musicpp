@@ -9,14 +9,13 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <spdlog/spdlog.h>
+#include <utils.h>
 
 using namespace std;
 
-struct spotifyResult {
-    std::string url;
-    std::string image;
-};
+namespace spdlog {
+    class logger;
+}
 
 class SpotifyAPI {
 public:
@@ -31,7 +30,7 @@ public:
 
     string getAccessToken();
 
-    spotifyResult searchTracks(const string &title = "",
+    searchResult searchTracks(const string &title = "",
                         const string &artist = "",
                         const string &album = "");
 
@@ -44,6 +43,8 @@ private:
     thread refreshThread;
     mutex tokenMutex;
     uint64_t lastRefreshTime;
+    std::condition_variable cv;
+    std::mutex cvMutex;
 
     bool requestToken();
 

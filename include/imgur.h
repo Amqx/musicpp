@@ -23,7 +23,7 @@ public:
 
     ImgurAPI &operator=(const ImgurAPI &) = delete;
 
-    string uploadImage(IRandomAccessStreamReference const &streamRef) const;
+    string uploadImage(const IRandomAccessStreamReference &streamRef) const;
 
 private:
     string clientID;

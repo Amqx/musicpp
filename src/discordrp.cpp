@@ -6,19 +6,19 @@
 #include <stringutils.h>
 
 
-discordrp::discordrp(mediaPlayer *player, const uint64_t apikey, spdlog::logger* logger) {
+discordrp::discordrp(mediaPlayer *player, const uint64_t& apikey, spdlog::logger* logger) {
     this->appleMusic = player;
     this->clientID = apikey;
     running = true;
     this->refreshThread = thread(&discordrp::refreshLoop, this);
     if (logger) {
-        logger->debug("Refresh thread started for discordrp.");
+        logger->debug("Refresh thread started for discordrp");
     }
     this -> logger = logger;
     client->SetApplicationId(clientID);
     client->Connect();
     if (logger) {
-        logger->info("discordrp connection initialized.");
+        logger->info("discordrp connection initialized");
     }
 }
 
@@ -40,6 +40,7 @@ void discordrp::update() const {
         const string album = discord_bounds(appleMusic -> getAlbum(), "Unknown Album");
         const string imglink = convertWString(appleMusic->getImage());
         const string amlink = convertWString(appleMusic->getAMLink());
+        const string LFMlink = convertWString(appleMusic->getLastFMLink());
         const string splink = convertWString(appleMusic->getSpotifyLink());
 
         // Basic info
@@ -67,7 +68,7 @@ void discordrp::update() const {
         discordpp::ActivityTimestamps timestamps;
         if (appleMusic->getState()) {
             timestamps.SetStart(appleMusic->getStartTS());
-            timestamps.SetEnd(static_cast<uint64_t>(appleMusic->getEndTS()));
+            timestamps.SetEnd(appleMusic->getEndTS());
             activity.SetTimestamps(timestamps);
             if (logger) {
                 logger -> debug("Timestamps (start, end): '{}' '{}'", appleMusic->getStartTS(), appleMusic->getEndTS());
@@ -96,16 +97,28 @@ void discordrp::update() const {
                 }
             }
         }
-        if (!splink.empty()) {
+        if (!LFMlink.empty() || !splink.empty()) {
             discordpp::ActivityButton button2;
-            button2.SetLabel("Spotify");
-            button2.SetUrl(splink);
-            activity.AddButton(button2);
-            if (logger) {
-                if (button2) {
-                    logger -> debug("Added Spotify button with URL: '{}'", splink);
-                } else {
-                    logger -> debug("Invalid Spotify button with URL: '{}'", splink);
+            if (!LFMlink.empty()) {
+                button2.SetLabel("LastFM");
+                button2.SetUrl(LFMlink);
+                activity.AddButton(button2);
+                if (logger) {
+                    if (button2) {
+                        logger -> debug("Added LastFM button with URL: '{}'", LFMlink);
+                    } else {
+                        logger -> debug("Invalid LastFM button with URL: '{}'", LFMlink);
+                    }
+                }
+            } else {button2.SetLabel("Spotify");
+                button2.SetUrl(splink);
+                activity.AddButton(button2);
+                if (logger) {
+                    if (button2) {
+                        logger -> debug("Added Spotify button with URL: '{}'", splink);
+                    } else {
+                        logger -> debug("Invalid Spotify button with URL: '{}'", splink);
+                    }
                 }
             }
         }
@@ -124,7 +137,7 @@ void discordrp::update() const {
         });
     } else {
         if (logger) {
-            logger->debug("Clearing Discord Rich Presence (missing metadata).");
+            logger->debug("Clearing Discord Rich Presence (missing metadata)");
         }
         client->ClearRichPresence();
     }

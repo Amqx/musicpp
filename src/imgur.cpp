@@ -30,10 +30,10 @@ ImgurAPI::~ImgurAPI() {
     }
 }
 
-string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) const {
+string ImgurAPI::uploadImage(const IRandomAccessStreamReference &streamRef) const {
     auto stream = streamRef.OpenReadAsync().get();
     uint64_t size = stream.Size();
-    vector<uint8_t> imageData(static_cast<size_t>(size));
+    vector<uint8_t> imageData(size);
 
     if (logger) {
         logger -> info("Performing Imgur upload with size: {} kB", size/1024);
@@ -41,7 +41,7 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
 
     DataReader reader(stream);
     (void) reader.LoadAsync(static_cast<uint32_t>(size)).get();
-    reader.ReadBytes(array_view<uint8_t>(imageData));
+    reader.ReadBytes(array_view(imageData));
     reader.Close();
 
     CURL *curl = curl_easy_init();
@@ -56,18 +56,20 @@ string ImgurAPI::uploadImage(IRandomAccessStreamReference const &streamRef) cons
     string readBuffer;
     string bearer = "Authorization: Client-ID " + clientID;
 
-    struct curl_slist *headers = nullptr;
+    curl_slist *headers = nullptr;
     headers = curl_slist_append(headers, bearer.c_str());
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
 
     curl_mime *mime = curl_mime_init(curl);
     curl_mimepart *part = curl_mime_addpart(mime);
     curl_mime_name(part, "image");
-    curl_mime_data(part, reinterpret_cast<const char *>(imageData.data()), static_cast<size_t>(imageData.size()));
+    curl_mime_data(part, reinterpret_cast<const char *>(imageData.data()), imageData.size());
     curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
 
     CURLcode res = curl_easy_perform(curl);

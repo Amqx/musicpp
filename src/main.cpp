@@ -19,13 +19,14 @@
 #include <resource.h>
 #include <sstream>
 #include <spdlog/spdlog.h>
-#include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <timeutils.h>
 #include <consoleutils.h>
 #include "stringutils.h"
 #include <unordered_set>
 #include <vector>
 #include <iomanip>
+#include <lfm.h>
 
 using namespace std;
 namespace {
@@ -35,6 +36,8 @@ namespace {
         std::shared_ptr<spdlog::logger> logger;
 
         std::unique_ptr<amscraper> scraper;
+
+        std::unique_ptr<lfm> lastfm;
 
         std::unique_ptr<SpotifyAPI> spotify;
 
@@ -73,9 +76,40 @@ namespace {
     };
     const unordered_set<string> kValidRegions{kRegionList.begin(), kRegionList.end()};
     constexpr char kRegionDbKey[] = "config:region";
-    constexpr const char *kDefaultRegion = "ca";
+    constexpr auto kDefaultRegion = "ca";
 } // Constants
 namespace {
+    string makeLogName() {
+        const auto now = chrono::system_clock::now();
+        time_t t = chrono::system_clock::to_time_t(now);
+        tm tm{};
+        localtime_s(&tm, &t);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "musicpp_%04d-%02d-%02d_%02d-%02d-%02d.log",
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec
+        );
+        return string(buf);
+    }
+    void pruneLogs(const filesystem::path& folder) {
+        int maxFiles = 10;
+        std::vector<filesystem::directory_entry> files;
+        for (auto& entry : filesystem::directory_iterator(folder)) {
+            if (entry.is_regular_file()) files.push_back(entry);
+        }
+        ranges::sort(files, [](auto& a, auto& b) {
+            return a.last_write_time() > b.last_write_time();
+        });
+
+        if (files.size() > maxFiles) {
+            for (size_t i = maxFiles; i < files.size(); i++) {
+                error_code ec;
+                filesystem::remove(files[i], ec);
+                if (ec) {
+                    wcout << L"Failed to remove old log file: " << convertToWString(files[i].path().string()) << endl;;
+                }
+            }
+        }
+    }
     bool isValidRegion(const std::string &region) {
         return kValidRegions.contains(region);
     }
@@ -153,13 +187,13 @@ namespace {
 
         const filesystem::path basePath(path);
         const filesystem::path dbPath = basePath / "musicpp" /"song_db";
-        const filesystem::path logPath = basePath  / "musicpp" / "logs" / "musicpp.log";
+        const filesystem::path logPath = basePath  / "musicpp" / "logs" ;
         CoTaskMemFree(path);
 
         std::error_code ec1, ec2;
 
-        filesystem::create_directories(dbPath, ec1);
-        filesystem::create_directories(logPath.parent_path(), ec2);
+        create_directories(dbPath, ec1);
+        create_directories(logPath, ec2);
 
         if (ec1) {
             wcout << L"Fatal: Could not create db folder: " << ec1.message().c_str() << endl;
@@ -170,20 +204,20 @@ namespace {
             wcout << L"Could not create log folder: " << ec2.message().c_str() << endl;
             wcout << L"The program will not have logs. Continuing..." << endl;
         } else {
-            auto max_size = 1048576 * 5; // 5mb
-            auto max_files = 3; // 3 files
-            auto logger = spdlog::rotating_logger_mt("MusicPP Logger", logPath.string(), max_size, max_files);
+            pruneLogs(logPath);
+            const string name = makeLogName();
+            auto logger = spdlog::basic_logger_mt("MusicPP Logger", (logPath / name).string());
     #ifdef LOG_LEVEL_DEBUG
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
     #elif defined(LOG_LEVEL_INFO)
             spdlog::set_level(spdlog::level::info);
-            spdlog::flush_every(std::chrono::seconds(30));
+            spdlog::flush_every(std::chrono::seconds(15));
     #else
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
     #endif
-            spdlog::set_pattern("[%H:%M:%S %z] [%n] [%^---%L---%$] [thread %t] %v");
+            spdlog::set_pattern("(%H:%M:%S %z, [%8l]) Thread %t: %v");
             ctx.logger = logger;
         }
 
@@ -231,7 +265,7 @@ namespace {
                     break;
                 }
 
-                this_thread::sleep_for(chrono::milliseconds(100));
+                this_thread::sleep_for(chrono::milliseconds(50));
             }
 
             if (interaction) break;
@@ -242,7 +276,7 @@ namespace {
             if (ctx.logger) ctx.logger->info("User interaction detected, entering Configuration Mode.");
             wcout << L"\n\n[Configuration Mode]" << endl;
 
-            wcout << L"Enter 1 to force reset all API Keys." << endl;
+            wcout << L"Enter 1 to force reset all API Keys" << endl;
 
             wcout << L"Enter 2 to change Apple Music region" << endl;
 
@@ -273,7 +307,7 @@ namespace {
                 }
             }
         } else {
-            if (ctx.logger) ctx.logger -> info("Auto-Start mode, no user interaction.");
+            if (ctx.logger) ctx.logger -> info("Auto-Start mode, no user interaction");
             wcout << L"\n\n[Auto-Start] No interaction detected. Loading keys..." << endl;
         }
 
@@ -293,16 +327,25 @@ namespace {
         wstring i_cid = EnsureCredential(L"musicpp/imgur_client_id", L"Imgur Client ID",
                                          L"https://api.imgur.com/oauth2/addclient", forceReset, ctx.logger.get());
 
+        wstring lfm_key = EnsureCredential(L"musicpp/lastfm_api_key", L"LastFM API Key", L"https://www.last.fm/api/account/create",
+            forceReset, ctx.logger.get());
 
-        wcout << "\nAll APIKeys found!" << endl;
+        wstring lfm_secret = EnsureCredential(L"musicpp/lastfm_secret", L"LastFM Secret", L"https://www.last.fm/api/account/create", forceReset, ctx.logger.get());
+
+        wcout << "\nAll APIKeys found" << endl;
         if (ctx.logger) {
-            ctx.logger -> info("All API keys loaded successfully.");
+            ctx.logger -> info("All API keys loaded successfully");
         }
 
         // Initialize API and Player objects
         wcout << L"Apple Music region: " << region.c_str() << endl;
         ctx.scraper = std::make_unique<amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger -> info("AMScraper initialized with region {}", region);
+
+        ctx.lastfm = std::make_unique<lfm>(convertWString(lfm_key), convertWString(lfm_secret), ctx.logger.get());
+        if (ctx.logger) {
+            ctx.logger -> info("LastFM initialized");
+        }
 
         ctx.spotify = std::make_unique<SpotifyAPI>(convertWString(s_cid), convertWString(s_sec), ctx.logger.get());
         if (ctx.logger) {
@@ -312,7 +355,7 @@ namespace {
         ctx.imgur = std::make_unique<ImgurAPI>(convertWString(i_cid), ctx.logger.get());
         if (ctx.logger) ctx.logger -> info("ImgurAPI initialized");
 
-        ctx.player = std::make_unique<mediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(), ctx.db.get(), ctx.logger.get());
+        ctx.player = std::make_unique<mediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(), ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
         if (ctx.logger) ctx.logger -> info("mediaPlayer initialized");
 
         ctx.discord = std::make_unique<discordrp>(ctx.player.get(), 1358389458956976128, ctx.logger.get());
@@ -352,7 +395,7 @@ namespace {
 
         ctx->lastTip = tip;
 
-        if (ctx -> logger) ctx->logger->debug("Updating tray tooltip to: {}", convertWString(tip.c_str()));
+        if (ctx -> logger) ctx->logger->debug("Updating tray tooltip to: {}", convertWString(tip));
 
         lstrcpynW(ctx->nid.szTip, tip.c_str(), ARRAYSIZE(ctx->nid.szTip));
 
@@ -395,7 +438,7 @@ namespace {
 
                 Shell_NotifyIcon(NIM_ADD, &ctx->nid);
 
-                if (ctx->logger) ctx->logger->info("Window created and tray icon added.");
+                if (ctx->logger) ctx->logger->info("Window created and tray icon added");
 
                 // Start Timers
 
@@ -516,7 +559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     LoadCredentials(ctx, forceReset, region);
     if (ctx.logger) ctx.logger->info("Load credentials finished");
 
-    wcout << "\nThis console window will automatically close in 3 seconds." << endl;
+    wcout << "\nThis console window will automatically close in 3 seconds" << endl;
 
     for (int i = 3; i > 0; --i) {
         wcout << L"Closing in " << i << L" seconds... \r" << flush;
@@ -525,7 +568,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     CleanupConsole();
-    if (ctx.logger) ctx.logger->info("Console cleanup complete. Moving to message loop.");
+    if (ctx.logger) ctx.logger->info("Console cleanup complete, moving to message loop");
 
     WNDCLASSW wc{};
 

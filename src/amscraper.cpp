@@ -9,11 +9,10 @@
 #include <libxml/tree.h>
 #include <regex>
 #include <algorithm>
-
 #include "stringutils.h"
 
 namespace {
-    bool fuzzyMatch(const std::string &a, const std::string &b) {
+    bool FuzzyMatch(const std::string &a, const std::string &b) {
         double similarity = calculateSimilarity(a, b);
         return similarity >= 0.6;
     }
@@ -51,7 +50,7 @@ namespace {
     xmlNodePtr findDescendantWithAttr(xmlNodePtr node, const char *tagName, const char *attrName, const char *attrValue) {
         for (xmlNodePtr current = node; current; current = current->next) {
             if (current->type == XML_ELEMENT_NODE) {
-                if (!tagName || (xmlStrcasecmp(current->name, BAD_CAST tagName) == 0)) {
+                if (!tagName || xmlStrcasecmp(current->name, BAD_CAST tagName) == 0) {
                     std::string attr = getAttribute(current, attrName);
                     if (!attr.empty() && attr == attrValue) {
                         return current;
@@ -96,8 +95,8 @@ namespace {
 
         if (foundTitle.empty() || foundArtist.empty()) return false;
 
-        bool titleMatch = fuzzyMatch(foundTitle, targetTitle) || foundTitle.find(normalize(targetTitle)) != std::string::npos;
-        bool artistMatch = fuzzyMatch(foundArtist, targetArtist) || foundArtist.find(normalize(targetArtist)) != std::string::npos;
+        bool titleMatch = FuzzyMatch(foundTitle, targetTitle) || foundTitle.find(normalize(targetTitle)) != std::string::npos;
+        bool artistMatch = FuzzyMatch(foundArtist, targetArtist) || foundArtist.find(normalize(targetArtist)) != std::string::npos;
 
         return titleMatch && artistMatch;
     }
@@ -130,7 +129,7 @@ amscraper::~amscraper() {
     }
 }
 
-scraperResult amscraper::searchTracks(const std::string &title, const std::string &artist, const std::string &album) const {
+searchResult amscraper::searchTracks(const std::string &title, const std::string &artist, const std::string &album) const {
 
     const std::string url = "https://music.apple.com/" + region + "/search?term=" + urlEncode(title + " " + album + " " + artist, logger);
 
@@ -138,7 +137,7 @@ scraperResult amscraper::searchTracks(const std::string &title, const std::strin
         logger -> debug("Performing Apple Music search with query {}", url);
     }
 
-    scraperResult results = {"", ""};
+    searchResult results = {"", ""};
 
     CURL *curl = curl_easy_init();
     if (!curl) {
@@ -149,7 +148,7 @@ scraperResult amscraper::searchTracks(const std::string &title, const std::strin
     }
     std::string readBuffer;
 
-    struct curl_slist *headers = nullptr;
+    curl_slist *headers = nullptr;
     headers = curl_slist_append(
         headers,
         "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
@@ -158,6 +157,8 @@ scraperResult amscraper::searchTracks(const std::string &title, const std::strin
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
 
     CURLcode res = curl_easy_perform(curl);
     curl_slist_free_all(headers);

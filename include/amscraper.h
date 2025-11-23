@@ -6,15 +6,11 @@
 #define MUSICPP_AMSCRAPER_H
 
 #include <string>
+#include <utils.h>
 
 namespace spdlog {
     class logger;
 }
-
-struct scraperResult {
-    std::string url;
-    std::string image;
-};
 
 class amscraper {
 public:
@@ -22,11 +18,10 @@ public:
 
     ~amscraper();
 
-    scraperResult searchTracks(const std::string& title, const std::string& artist, const std::string& album) const;
+    searchResult searchTracks(const std::string& title, const std::string& artist, const std::string& album) const;
 private:
     std::string region;
     spdlog::logger *logger;
-
 };
 
 

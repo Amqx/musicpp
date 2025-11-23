@@ -42,7 +42,7 @@ inline void CheckError(BOOL result, const std::wstring &task, spdlog::logger *lo
 
 void WriteGenericCredential(const std::wstring &targetName, const std::wstring &secret, spdlog::logger *logger) {
     const auto *secretBuffer = reinterpret_cast<const BYTE *>(secret.c_str());
-    const std::vector<BYTE> secretBlob(
+    const std::vector secretBlob(
         secretBuffer,
         secretBuffer + (secret.size() + 1) * sizeof(wchar_t)
     );
@@ -72,7 +72,7 @@ std::wstring ReadGenericCredential(const std::wstring &targetName, spdlog::logge
 
     if (success && pCred != nullptr) {
         if (pCred->CredentialBlob && pCred->CredentialBlobSize > 0) {
-            const wchar_t *secretData = reinterpret_cast<const wchar_t *>(pCred->CredentialBlob);
+            const auto *secretData = reinterpret_cast<const wchar_t *>(pCred->CredentialBlob);
             const size_t charCount = pCred->CredentialBlobSize / sizeof(wchar_t);
             credentialBuffer.assign(secretData, secretData + charCount);
             if (!credentialBuffer.empty() && credentialBuffer.back() == L'\0') {

@@ -26,8 +26,6 @@ include_directories(resources)
 
 set(RESOURCE_FILE src/resource.rc)
 
-add_definitions(-D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN)
-
 add_executable(musicpp
         src/main.cpp
         src/mediaPlayer.cpp
@@ -43,7 +41,10 @@ add_executable(musicpp
         src/utils.cpp
         src/amscraper.cpp
         include/amscraper.h
+        src/lfm.cpp
 )
+
+target_compile_definitions(musicpp PRIVATE -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T)
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(LOG_LEVEL_DEBUG)
@@ -62,3 +63,17 @@ add_custom_command(TARGET musicpp POST_BUILD
         "${DISCORD_SHARED_LIB}"
         $<TARGET_FILE_DIR:musicpp>;
 )
+
+
+
+add_executable(lfmtest
+        src/lfm.cpp
+        testfiles/lfmtest.cpp
+        src/utils.cpp
+        src/timeutils.cpp
+        src/stringutils.cpp
+        src/credhelper.cpp
+        src/amscraper.cpp
+        src/spotify.cpp
+)
+target_link_libraries(lfmtest PRIVATE CURL::libcurl windowsapp nlohmann_json::nlohmann_json Advapi32 spdlog::spdlog LibXml2::LibXml2)
