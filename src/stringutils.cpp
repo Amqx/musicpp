@@ -184,5 +184,3 @@ std::string md5(const std::string &input) {
 
     return out;
 }
-
-const char *b(const bool v) { return v ? "1" : "0"; }

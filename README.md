@@ -2,22 +2,26 @@
 
 Discord Rich Presence for Apple Music written in C++ using Windows Runtime APIs.
 
-![status](images/status.png)
-
 ![full](images/full.png)
+
+![status](images/mini.png)
 
 ## Features
 
 - Displays track title, artist, and album
-- Shows album art sourced from Apple Music, with Spotify and Imgur as fallbacks
+- Shows album art sourced from Apple Music (99% find rate), with Spotify and Imgur as fallbacks
 - Caching with [LevelDB](https://github.com/google/leveldb)
 - Progress bar/ timestamps
 - Last.fm now playing and scrobbling support
 - Tray icon for current status
 - Support for "Listening to {title}" status (similar to old Spotify presence behaviour)
-- Buttons to open the track in Apple Music and/ or Spotify (when found)
+- Buttons to open the track in Apple Music and LastFM/ Spotify (when found)
 - Low resource usage (~5MB RAM, ~0.1% CPU, ~11MB disk space (including dependencies))
 - Written entirely in Windows native C++
+
+Warning: this code does not have any configurability. If you want to modify the status display, you will have to do so
+manually.
+See below for more details.
 
 ## Requirements
 
@@ -25,6 +29,37 @@ Discord Rich Presence for Apple Music written in C++ using Windows Runtime APIs.
 - Spotify API Credentials ([optional](https://developer.spotify.com/dashboard))
 - Imgur API Credentials ([optional](https://api.imgur.com/oauth2/addclient))
 - Last.fm API credentials ([options](https://www.last.fm/api/account/create))
+
+## Configuring the rich presence
+
+To modify the presence, do note that you will need to recompile the code. Please read the following section on how to
+compile before continuing.
+
+The code that updates the rich presence can be found [here](src/discordrp.cpp), in the`void discordrp::update()` method.
+The available metadata has been listed below, and are already extracted for you. You can use Discord's
+guide [here](https://discord.com/developers/docs/social-sdk/classdiscordpp_1_1Activity.html)
+for more details.
+
+#### Available metadata
+
+For the source links, please check if they are not empty before using them (.empty). Furthermore, please use the current
+playback
+state to determine which timestamps should be used (start_ts and end_ts when playing is true, pause_ts when playing is
+false).
+
+The following are listed in the format: {name} ({type})({var name})
+
+- Title (string)(title)
+- Artist (string)(artist)
+- Album (string)(album)
+- Image link (string)(imglink)
+- Apple Music link (string)(amlink)
+- LastFM link (string)(LFMlink)
+- Spotify link (string)(splink)
+- Current playback state (boolean)(playing)
+- Playback start time (int)(start_ts)
+- Projected playback end time (int)(end_ts)
+- When the current track was paused (int)(pause_ts)
 
 ## Building from Source
 

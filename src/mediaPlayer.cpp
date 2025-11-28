@@ -138,6 +138,7 @@ void mediaPlayer::getInfo() {
             logger->info("Managed to revive SMTCSM. Tracking started");
         }
     }
+    findRunning();
     if (!hasActiveSession()) {
         reset();
         if (logger) {
@@ -146,14 +147,35 @@ void mediaPlayer::getInfo() {
         return;
     }
 
-    updatePlaybackState(session.GetPlaybackInfo());
-    updateTimeline(session.GetTimelineProperties());
+    try {
+        updatePlaybackState(session.GetPlaybackInfo());
+        updateTimeline(session.GetTimelineProperties());
+    } catch (exception &e) {
+        if (logger) {
+            logger->warn("Failed to update playback state: {}", e.what());
+        }
+        reset();
+        session = nullptr;
+        return;
+    }
 
     wstring oldTitle = title;
     wstring oldAlbum = album;
     wstring oldArtist = artist;
 
-    auto properties = session.TryGetMediaPropertiesAsync().get();
+    Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties properties{nullptr};
+
+    try {
+        properties = session.TryGetMediaPropertiesAsync().get();
+    } catch (exception &e) {
+        if (logger) {
+            logger->warn("Failed to update get media properties: {}", e.what());
+        }
+        reset();
+        session = nullptr;
+        return;
+    }
+
     if (!updateMetadata(properties)) {
         reset();
         return;
@@ -183,6 +205,8 @@ void mediaPlayer::getInfo() {
         return;
     }
 
+    const auto currTime = unix_seconds_now();
+
     if (logger)
         logger->info("Track changed: '{}' by '{}' on '{}'",
                      convertWString(this->title),
@@ -201,7 +225,6 @@ void mediaPlayer::getInfo() {
 
     ArtworkLog logInfo;
     const string songKey = sanitizeKeys(stitle) + '|' + sanitizeKeys(sartist) + '|' + sanitizeKeys(salbum);
-    const auto currTime = unix_seconds_now();
 
     if (!setNowPlaying && playing) {
         thread([this, stitle, sartist, salbum, duration] {
@@ -338,12 +361,6 @@ void mediaPlayer::updatePlaybackState(
         pause();
         if (prev_state && logger) {
             logger->info("Playback transitioned to paused/stopped");
-        }
-
-        if (!scrobbled && setNowPlaying) {
-            std::thread([this] {
-                clearNowPlaying();
-            }).detach();
         }
     }
 }
@@ -588,7 +605,7 @@ void mediaPlayer::fetchArtworkSpotify(const time_t &currTime, const string &song
     // 1. image is empty
     // 2. lastfm's link is also empty
     // 3. spotify's link is ALSO empty
-    if (!image.empty() && !lastfmlink.empty() && !spotify_link.empty()) {
+    if (!image.empty() && !lastfmlink.empty() && !amlink.empty()) {
         return;
     }
     logInfo.spotify_used = true;
@@ -638,55 +655,48 @@ void mediaPlayer::fetchArtworkImgur(const time_t &currTime, const string &songKe
     }
 }
 
-void mediaPlayer::clearNowPlaying() {
-    if (lastfm_client) {
-        this->setNowPlaying = false;
-        if (lastfm_client->updateNowPlaying("", "", "", -1)) {
-            if (logger) {
-                logger->debug("LastFM 'Now Playing' status cleared due to pause before scrobble");
-            }
-            return;
-        }
-        if (logger) {
-            logger->warn(
-                "Failed to clear LastFM 'Now Playing' status, may have a ghost scrobble. Please report this with the logs.");
-        }
-    }
-}
-
 void mediaPlayer::log_artwork(const ArtworkLog &a) const {
-    if (logger) {
-        logger->info(
-            "ArtworkLog "
-            "db_hits[am:{} lf:{} sp:{} img:{}] "
-            "expired[i:{} am:{} lf:{} sp:{}] "
-            "flags[parse_error:{} am:{} lf:{} sp:{} img:{} cache:{}] "
-            "avail[am:{} lf:{} sp:{}] "
-            "db_url = \"{}\" final_url=\"{}\" source=\"{}\"",
-            b(a.db_hit_image),
-            b(a.db_hit_amlink),
-            b(a.db_hit_lastfmlink),
-            b(a.db_hit_spotifylink),
+    if (!logger) return;
 
-            b(a.db_image_expired),
-            b(a.db_amlink_expired),
-            b(a.db_lastfmlink_expired),
-            b(a.db_spotifylink_expired),
+    string flags_str;
 
-            b(a.db_parse_error),
-            b(a.scraper_used),
-            b(a.lastfm_used),
-            b(a.spotify_used),
-            b(a.imgur_used),
-            b(a.cache_written),
+    auto append_flag = [&](const char *name, bool value) {
+        if (value) {
+            if (!flags_str.empty()) flags_str += " ";
+            flags_str += name;
+        }
+    };
 
-            b(a.AM_link_available),
-            b(a.lastfm_link_available),
-            b(a.Spotify_link_available),
+    // database hits
+    append_flag("db_hit_image", a.db_hit_image);
+    append_flag("db_hit_am", a.db_hit_amlink);
+    append_flag("db_hit_lfm", a.db_hit_lastfmlink);
+    append_flag("db_hit_sp", a.db_hit_spotifylink);
 
-            a.db_url,
-            a.final_url,
-            a.final_source
-        );
-    }
+    // expirations
+    append_flag("img_expired", a.db_image_expired);
+    append_flag("amlink_expired", a.db_amlink_expired);
+    append_flag("lfmlink_expired", a.db_lastfmlink_expired);
+    append_flag("splink_expired", a.db_spotifylink_expired);
+
+    // sources used
+    append_flag("parse_error", a.db_parse_error);
+    append_flag("am_used", a.scraper_used);
+    append_flag("lfm_used", a.lastfm_used);
+    append_flag("spotify_used", a.spotify_used);
+    append_flag("imgur_used", a.imgur_used);
+    append_flag("cache_written", a.cache_written);
+
+    // links available
+    append_flag("am_avail", a.AM_link_available);
+    append_flag("lfm_avail", a.lastfm_link_available);
+    append_flag("sp_avail", a.Spotify_link_available);
+
+    logger->info(
+        R"(ArtworkLog | Flags: [{}] | DB URL: "{}" | Final URL: "{}" | Source: "{}")",
+        flags_str.empty() ? "NONE" : flags_str,
+        a.db_url,
+        a.final_url,
+        a.final_source
+    );
 }

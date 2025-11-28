@@ -42,11 +42,15 @@ void discordrp::update() const {
         const string amlink = convertWString(appleMusic->getAMLink());
         const string LFMlink = convertWString(appleMusic->getLastFMLink());
         const string splink = convertWString(appleMusic->getSpotifyLink());
+        const bool playing = appleMusic->getState();
+        const uint64_t start_ts = appleMusic->getStartTS();
+        const uint64_t end_ts = appleMusic->getEndTS();
+        const uint64_t pause_ts = appleMusic->getPauseTimer();
 
         // Basic info
         activity.SetName(artist);
-        activity.SetDetails(title); // title
-        activity.SetState(artist); // artist
+        activity.SetDetails(title);
+        activity.SetState(artist);
         activity.SetStatusDisplayType(discordpp::StatusDisplayTypes::Details);
         activity.SetType(discordpp::ActivityTypes::Listening);
         if (logger) {
@@ -67,20 +71,20 @@ void discordrp::update() const {
 
         // Time
         discordpp::ActivityTimestamps timestamps;
-        if (appleMusic->getState()) {
-            timestamps.SetStart(appleMusic->getStartTS());
-            timestamps.SetEnd(appleMusic->getEndTS());
+        if (playing) {
+            timestamps.SetStart(start_ts);
+            timestamps.SetEnd(end_ts);
             activity.SetTimestamps(timestamps);
             if (logger) {
                 logger->debug("Timestamps (start, end): '{}' '{}'", appleMusic->getStartTS(), appleMusic->getEndTS());
             }
         } else {
-            timestamps.SetStart(appleMusic->getPauseTimer());
+            timestamps.SetStart(pause_ts);
             activity.SetTimestamps(timestamps);
             assets.SetSmallImage("pause");
             assets.SetSmallText("Paused");
             if (logger) {
-                logger->debug("Timestamps (paused at): '{}'", appleMusic->getPauseTimer());
+                logger->debug("Timestamps (paused at): '{}'", pause_ts);
             }
         }
 

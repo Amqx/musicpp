@@ -256,6 +256,8 @@ bool lfm::authGetSession(const std::string &token) {
 }
 
 string lfm::searchTracks(const std::string &title, const std::string &artist) const {
+    if (!enabled) return "";
+
     string readBuffer;
 
     string url = "https://ws.audioscrobbler.com/2.0/?method=track.search&track=" + urlEncode(title, logger) + "&artist="

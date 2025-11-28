@@ -222,12 +222,12 @@ namespace {
             logger->flush_on(spdlog::level::debug);
 #elif defined(LOG_LEVEL_INFO)
             spdlog::set_level(spdlog::level::info);
-            spdlog::flush_every(std::chrono::seconds(15));
+            spdlog::flush_every(std::chrono::seconds(2));
 #else
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
 #endif
-            spdlog::set_pattern("(%H:%M:%S %z, [%8l]) Thread %t: %v");
+            spdlog::set_pattern("(%Y-%m-%d %H:%M:%S %z, [%8l]) Thread %t: %v");
             ctx.logger = logger;
         }
 
@@ -478,8 +478,13 @@ namespace {
 
 
                     if (HMENU hMenu = CreatePopupMenu()) {
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, TEXT("MusicPP"));
+                        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getTitle().c_str());
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getArtist().c_str());
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getAlbum().c_str());
+                        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
-
                         UINT cmd = TrackPopupMenu(
                             hMenu,
                             TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RETURNCMD,

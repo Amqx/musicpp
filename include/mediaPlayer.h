@@ -155,8 +155,6 @@ private:
     void fetchArtworkImgur(const time_t &currTime, const string &songKey, const IRandomAccessStreamReference &thumb,
                            ArtworkLog &logInfo);
 
-    void clearNowPlaying();
-
     void log_artwork(const ArtworkLog &a) const;
 };
 
