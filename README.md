@@ -16,12 +16,11 @@ Discord Rich Presence for Apple Music written in C++ using Windows Runtime APIs.
 - Tray icon for current status
 - Support for "Listening to {title}" status (similar to old Spotify presence behaviour)
 - Buttons to open the track in Apple Music and LastFM/ Spotify (when found)
-- Low resource usage (~5MB RAM, ~0.1% CPU, ~11MB disk space (including dependencies))
+- Low resource usage (~5-10MB RAM, ~0.1% CPU, ~11MB disk space (including dependencies))
 - Written entirely in Windows native C++
 
-Warning: this code does not have any configurability. If you want to modify the status display, you will have to do so
-manually.
-See below for more details.
+Warning: Because this project was built for my own usage only, I made this without configurability in mind.
+If you want to modify anything, you will have to do so manually. See below for more details.
 
 ## Requirements
 
@@ -30,13 +29,19 @@ See below for more details.
 - Imgur API Credentials ([optional](https://api.imgur.com/oauth2/addclient))
 - Last.fm API credentials ([options](https://www.last.fm/api/account/create))
 
-## Configuring the rich presence
+## Configuration
 
-To modify the presence, do note that you will need to recompile the code. Please read the following section on how to
-compile before continuing.
+To modify any part of this you will have to recompile it from source. Please read the following section on building from
+source
+for help with that.
+
+### Discord Rich Presence
+
+You can change the style of the rich presence that is shown on Discord. Do note that buttons cannot be viewed from the
+rich presence user's perspective, and require an alt account to view.
 
 The code that updates the rich presence can be found [here](src/discordrp.cpp), in the`void discordrp::update()` method.
-The available metadata has been listed below, and are already extracted for you. You can use Discord's
+The available metadata has been listed below, and has already been extracted for you. You can use Discord's
 guide [here](https://discord.com/developers/docs/social-sdk/classdiscordpp_1_1Activity.html)
 for more details.
 
@@ -47,7 +52,7 @@ playback
 state to determine which timestamps should be used (start_ts and end_ts when playing is true, pause_ts when playing is
 false).
 
-The following are listed in the format: {name} ({type})({var name})
+The following are listed in the format: {description} ({type})({var name})
 
 - Title (string)(title)
 - Artist (string)(artist)
@@ -60,6 +65,25 @@ The following are listed in the format: {name} ({type})({var name})
 - Playback start time (int)(start_ts)
 - Projected playback end time (int)(end_ts)
 - When the current track was paused (int)(pause_ts)
+
+### Last.FM Scrobbling behaviour
+
+You can manually change the behaviour of when a scrobble should be considered valid. This can be
+found [here](include/mediaPlayer.h).
+Modify the constexpr at the top to control the behaviour.
+
+#### Available configuration
+
+Before changing anything, please make sure you read the last.fm
+API [documentation](https://www.last.fm/api/show/track.scrobble) and [guidelines](https://www.last.fm/api/scrobbling).
+Some settings have a minimum
+value, and will break the rules provisioned by last.fm, causing you to have invalid scrobbles.
+
+The following are listed in the format: {description} ({type})({var name})({min})
+
+- Minimum length a track should be in seconds (int)(kLfmMinTime)(30)
+- Percentage of duration before being sent for scrobble (double)(kLfmPercentage)(0.5)
+- Time before a track should be automatically scrobbled in seconds (int)(kLfmElapsedTime)(240)
 
 ## Building from Source
 
@@ -129,7 +153,7 @@ The easiest way to do this is with CLion. Make sure you have the VCPKG extension
 ## Installing the Discord Social SDK
 
 You can download it from the [Discord Developer Portal](https://discord.com/developers/docs/game-sdk/sdk-starter-guide).
-Do note that you have to login/ signup
+Do note that you have to log in or signup
 to download the SDK. When prompted to create an application, do note that if you intend to
 use your own application id, the name is what shows on Discord ("Listening to {name}" in the screenshot with the
 buttons). If

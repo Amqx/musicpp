@@ -10,14 +10,19 @@
 #include <limits>
 #include <winrt/windows.media.control.h>
 #include <winrt/base.h>
-#include <winrt/Windows.Media.h>
-#include <winrt/windows.foundation.h>
 #include <winrt/windows.foundation.collections.h>
 #include <spotify.h>
 #include <imgur.h>
 #include <amscraper.h>
 #include "leveldb/db.h"
 #include <lfm.h>
+
+// BEFORE CHANGING THESE, PLEASE READ README.md FOR MORE INFO. SOME OF THESE VALUES
+// CANNOT BE CHANGED BELOW A CERTAIN VALUE AND WILL CAUSE INVALID SCROBBLES
+
+constexpr int kLfmMinTime = 30;
+constexpr double kLfmPercentage = 0.75;
+constexpr int kLfmElapsedTime = 240;
 
 namespace spdlog {
     class logger;

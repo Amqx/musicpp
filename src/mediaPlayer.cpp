@@ -189,8 +189,9 @@ void mediaPlayer::getInfo() {
 
     if (!(oldTitle != title || oldAlbum != album || oldArtist != artist)) {
         if (const time_t elapsedTime = getElapsedSeconds();
-            !scrobbled && totalTime > 30 && ((static_cast<double>(elapsedTime) / static_cast<double>(this->totalTime) >=
-                                              0.5 || elapsedTime > 240))) {
+            !scrobbled && totalTime > kLfmMinTime && ((
+                static_cast<double>(elapsedTime) / static_cast<double>(this->totalTime) >=
+                kLfmPercentage || elapsedTime > kLfmElapsedTime))) {
             std::thread([this, stitle, sartist, salbum, startTime] {
                 if (scrobbleattempts < 3) {
                     if (lastfm_client->scrobble(stitle, sartist, salbum, startTime)) {
