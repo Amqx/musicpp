@@ -3,13 +3,14 @@
 Discord Rich Presence for the Windows Apple Music desktop app written in C++/WinRT.
 
 ![all](images/new.png)
+![tray](images/tray.png)
 
 ## Features
 
 - Rich presence with track title, artist, album, progress bar, and pause state
 - Album art with Apple Music first, then Spotify, then Imgur as fallbacks (cached in LevelDB)
 - Optional Last.fm now playing + scrobbling
-- Tray icon showing current status and quick exit
+- Tray icon allowing copy of metadata and toggling Discord Rich Presence/ Last.FM features
 - Presence buttons for Apple Music plus Last.fm or Spotify links (when available)
 - Low resource usage (~5–10MB RAM, ~0.1% CPU, ~20MB disk with deps)
 

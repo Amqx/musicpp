@@ -423,8 +423,9 @@ namespace {
         const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
         const HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
         if (!hMem) {
-            if (ctx->logger) ctx->logger->error("Failed to allocate memory for clipboard text: {}",
-                                                ConvertWString(text));
+            if (ctx->logger)
+                ctx->logger->error("Failed to allocate memory for clipboard text: {}",
+                                   ConvertWString(text));
             CloseClipboard();
             return;
         }
