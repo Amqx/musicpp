@@ -150,8 +150,8 @@ std::string DiscordBounds(const wstring &wstr, const string &fallback) {
 
         return out;
     }
-    if (len <= 1) {
-        return fallback;
+    if (len == 1) {
+        return ConvertWString(wstr + L'\u200B');
     }
     return ConvertWString(wstr);
 }
