@@ -58,6 +58,11 @@ namespace {
     UINT g_wm_taskbar_restart = 0;
     constexpr UINT WM_TRAYICON = WM_APP + 1;
     constexpr UINT ID_TRAY_EXIT = 1001;
+    constexpr UINT ID_COPY_TITLE = 1002;
+    constexpr UINT ID_COPY_ARTIST = 1003;
+    constexpr UINT ID_COPY_ALBUM = 1004;
+    constexpr UINT ID_TRAY_DISCORD_TOGGLE = 1005;
+    constexpr UINT ID_TRAY_LASTFM_TOGGLE = 1006;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
     const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
@@ -343,7 +348,7 @@ namespace {
         ctx.scraper = std::make_unique<Amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
-        ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.logger.get());
+        ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.db.get(), ctx.logger.get());
         if (ctx.logger) {
             ctx.logger->info("LastFM initialized");
         }
@@ -360,7 +365,7 @@ namespace {
                                                    ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("mediaPlayer initialized");
 
-        ctx.discord = std::make_unique<Discordrp>(ctx.player.get(), kDiscordApikey, ctx.logger.get());
+        ctx.discord = std::make_unique<Discordrp>(ctx.player.get(), kDiscordApikey, ctx.db.get(), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("discordrp initialized");
     }
 
@@ -398,13 +403,35 @@ namespace {
 
         ctx->last_tip = tip;
 
-        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: {}", ConvertWString(tip));
+        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: \n{}\n", ConvertWString(tip));
 
         lstrcpynW(ctx->nid.szTip, tip.c_str(), ARRAYSIZE(ctx->nid.szTip));
 
         ctx->nid.uFlags |= NIF_TIP | NIF_ICON | NIF_MESSAGE;
 
         Shell_NotifyIcon(NIM_MODIFY, &ctx->nid);
+    }
+
+    void CopyToClipboard(const AppContext *ctx, const std::wstring& text) {
+        if (!OpenClipboard(nullptr)) {
+            if (ctx->logger) ctx->logger->error("Failed to open clipboard for text: {}", ConvertWString(text));
+            return;
+        }
+        EmptyClipboard();
+
+        const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
+        const HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (!hMem) {
+            if (ctx->logger) ctx->logger->error("Failed to allocate memory for clipboard text: {}", ConvertWString(text));
+            CloseClipboard();
+            return;
+        }
+
+        memcpy(GlobalLock(hMem), text.c_str(), bytes);
+        GlobalUnlock(hMem);
+        SetClipboardData(CF_UNICODETEXT, hMem);
+        if (ctx->logger) ctx->logger->debug("Set clipboard to: {}", ConvertWString(text));
+        CloseClipboard();
     }
 
     LRESULT CALLBACK WndProc(const HWND hWnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
@@ -465,7 +492,7 @@ namespace {
                 SetTimer(hWnd, DATA_TIMER_ID, kLoopRefreshInterval, nullptr);
 
                 if (ctx->logger)
-                    ctx->logger->debug("Timer started: Data ({}) ms",
+                    ctx->logger->debug("Timer started: Data ({} ms)",
                                        kLoopRefreshInterval);
                 return 0;
             }
@@ -481,11 +508,25 @@ namespace {
 
 
                     if (const HMENU hMenu = CreatePopupMenu()) {
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, TEXT("MusicPP"));
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, TEXT("MusicPP"));
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetTitle().c_str());
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetArtist().c_str());
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetAlbum().c_str());
+                        if (ctx->player->GetState()) {
+                            AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Now Playing");
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, Truncate(ctx->player->GetTitle()).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, Truncate(ctx->player->GetArtist()).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, Truncate(ctx->player->GetAlbum()).c_str());
+                            AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+                        }
+
+                        const wstring discord_state = ctx->discord->GetState() ? L"Discord active" : L"Discord disabled";
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, discord_state.c_str());
+                        AppendMenu(hMenu, MF_STRING, ID_TRAY_DISCORD_TOGGLE, TEXT("Toggle Discord"));
+
+                        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->lastfm->GetReason().c_str());
+                        AppendMenu(hMenu, MF_STRING, ID_TRAY_LASTFM_TOGGLE, TEXT("Toggle LastFM"));
+
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
                         const UINT cmd = TrackPopupMenu(
@@ -512,12 +553,46 @@ namespace {
 
 
             case WM_COMMAND: {
-                if (LOWORD(wParam) == ID_TRAY_EXIT) {
-                    if (ctx->logger) ctx->logger->info("User requested application exit via tray menu.");
-                    SendMessage(hWnd, WM_CLOSE, 0, 0);
-                }
+                switch (LOWORD(wParam)) {
+                    case ID_TRAY_EXIT: {
+                        if (ctx->logger) ctx->logger->info("User requested application exit via tray menu.");
+                        SendMessage(hWnd, WM_CLOSE, 0, 0);
+                        return 0;
+                    }
 
-                return 0;
+                    case ID_TRAY_LASTFM_TOGGLE: {
+                        if (ctx->logger) ctx->logger->info("LastFM state toggled");
+                        ctx->lastfm->toggle();
+                        return 0;
+                    }
+
+                    case ID_TRAY_DISCORD_TOGGLE: {
+                        if (ctx->logger) ctx->logger->info("Discord state toggled");
+                        ctx->discord->toggle();
+                        return 0;
+                    }
+
+                    case ID_COPY_TITLE: {
+                        CopyToClipboard(ctx, ctx->player->GetTitle());
+                        return 0;
+                    }
+
+                    case ID_COPY_ARTIST: {
+                        CopyToClipboard(ctx, ctx->player->GetArtist());
+                        return 0;
+                    }
+
+                    case ID_COPY_ALBUM: {
+                        CopyToClipboard(ctx, ctx->player->GetAlbum());
+                        return 0;
+                    }
+
+                    default: {
+                        return 0;
+                    }
+
+
+                }
             }
 
 

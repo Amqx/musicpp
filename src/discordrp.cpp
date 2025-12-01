@@ -5,16 +5,30 @@
 #include <stringutils.h>
 #include <spdlog/spdlog.h>
 #include "discordrp.h"
-
 #include "constants.h"
 
-Discordrp::Discordrp(MediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger) {
+Discordrp::Discordrp(MediaPlayer *player, const uint64_t &apikey, leveldb::DB *db, spdlog::logger *logger) {
     this->apple_music_ = player;
     this->client_id_ = apikey;
-    running_ = true;
+    this->db_ = db;
     this->refresh_thread_ = thread(&Discordrp::RefreshLoop, this);
     if (logger) {
         logger->debug("Refresh thread started for discordrp");
+    }
+    running_ = true;
+    this->enabled_ = true;
+    if (db_) {
+        string result;
+        if (const auto status = db_->Get(leveldb::ReadOptions(), kDiscordStateKey, &result); !status.ok()) {
+            if (logger) logger->info("Did not find previous Discord state, resetting to active");
+        } else {
+            if (result == "false") {
+                enabled_ = false;
+                if (logger) logger->info("DB Discord state pulled: Set to false");
+            } else {
+                if (logger) logger->info("DB Discord state pulled: Set to true");
+            }
+        }
     }
     this->logger_ = logger;
     client_->SetApplicationId(client_id_);
@@ -27,14 +41,22 @@ Discordrp::Discordrp(MediaPlayer *player, const uint64_t &apikey, spdlog::logger
 Discordrp::~Discordrp() {
     running_ = false;
     client_->Disconnect();
+    if (db_) {
+        if (enabled_) {
+            db_->Put(leveldb::WriteOptions(), kDiscordStateKey, "true");
+        } else {
+            db_->Put(leveldb::WriteOptions(), kDiscordStateKey, "false");
+        }
+    }
     if (refresh_thread_.joinable()) refresh_thread_.join();
     if (this->logger_) {
+        logger_->info("Saved Discord state: "s + (enabled_ ? "true" : "false"));
         logger_->info("discordrp Killed");
     }
 }
 
 void Discordrp::update() const {
-    if (!apple_music_->GetTitle().empty() && !apple_music_->GetArtist().empty() && !apple_music_->GetAlbum().empty()) {
+    if (!apple_music_->GetTitle().empty() && !apple_music_->GetArtist().empty() && !apple_music_->GetAlbum().empty() && enabled_) {
         discordpp::Activity activity;
 
         const string title = DiscordBounds(apple_music_->GetTitle(), "Unknown Song");
@@ -147,15 +169,29 @@ void Discordrp::update() const {
             }
         });
     } else {
-        if (logger_) {
-            logger_->debug("Clearing Discord Rich Presence (missing metadata)");
+        if (!enabled_) {
+            if (logger_) {
+                logger_->debug("Clearing Discord Rich Presence (disabled)");
+            }
+        } else {
+            if (logger_) {
+                logger_->debug("Clearing Discord Rich Presence (missing metadata)");
+            }
         }
         client_->ClearRichPresence();
     }
 }
 
+void Discordrp::toggle() {
+    enabled_ = !enabled_;
+}
+
+bool Discordrp::GetState() const {
+    return enabled_;
+}
+
 void Discordrp::RefreshLoop() const {
-    while (running_) {
+    while (running_ && enabled_) {
         try {
             discordpp::RunCallbacks();
         } catch (exception &e) {

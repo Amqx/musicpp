@@ -28,12 +28,28 @@ bool UserExit() {
     return false;
 }
 
-Lfm::Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger *logger) {
+Lfm::Lfm(const std::string &apikey, const std::string &apisecret, leveldb::DB *db, spdlog::logger *logger) {
     this->apikey_ = apikey;
     this->apisecret_ = apisecret;
     this->logger_ = logger;
+    this->db_ = db;
     this->token_validity_ = -1;
-    this->enabled_ = false;
+    this->valid_ = false;
+    this->enabled_ = true;
+
+    if (db_) {
+        string result;
+        if (const auto status = db_->Get(leveldb::ReadOptions(), kLfmStateKey, &result); !status.ok()) {
+            if (logger) logger->info("Did not find previous LastFM state, resetting to active");
+        } else {
+            if (result == "false") {
+                enabled_ = false;
+                if (logger) logger->info("DB LastFM state pulled: Set to false");
+            } else {
+                if (logger) logger->info("DB LastFM state pulled: Set to true");
+            }
+        }
+    }
 
     if (const string session = ConvertWString(ReadGenericCredential(L"lastfm_sessionkey", logger));
         !session.empty() && AuthTestSession(session)) {
@@ -41,7 +57,7 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger
             logger->info("Successfully verified with LastFM using saved session key");
         }
         session_key_ = session;
-        enabled_ = true;
+        valid_ = true;
         return;
     }
     DeleteGenericCredential(L"lastfm_sessionkey", logger);
@@ -53,7 +69,10 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger
                 L"This error is most likely due to an incorrect API Key and Secret. Please check the logs for more info"
                 << endl;
         wcout << L"Press Enter or ESC to confirm: " << endl;
-        while (!UserExit());
+        while (!UserExit()) {
+            this_thread::sleep_for(chrono::milliseconds(50));
+        }
+        return;
     }
     wcout << L"Go to the following link to authorize LastFM:\n" << L"https://www.last.fm/api/auth/?api_key=" +
             wstring(ConvertToWString(apikey)) + L"&token=" + ConvertToWString(token) << endl;
@@ -89,7 +108,19 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger
     watcher.join();
 }
 
-Lfm::~Lfm() = default;
+Lfm::~Lfm() {
+    if (db_) {
+        if (enabled_) {
+            db_->Put(leveldb::WriteOptions(), kLfmStateKey, "true");
+        } else {
+            db_->Put(leveldb::WriteOptions(), kLfmStateKey, "false");
+        }
+    }
+    if (this->logger_) {
+        logger_->info("Saved LastFM state: "s + (enabled_ ? "true" : "false"));
+        logger_->info("Lfm Killed");
+    }
+}
 
 std::string Lfm::AuthRequestToken() {
     const std::string url = "https://ws.audioscrobbler.com/2.0/?method=auth.gettoken&api_key=" + apikey_ +
@@ -234,7 +265,7 @@ bool Lfm::AuthGetSession(const std::string &token) {
             const string name = j["session"]["name"];
             wcout << L"Authenticated as: " << ConvertToWString(name) << endl;
             session_key_ = j["session"]["key"];
-            enabled_ = true;
+            valid_ = true;
             WriteGenericCredential(L"lastfm_sessionkey", wstring(ConvertToWString(session_key_)));
             if (logger_) {
                 logger_->info("Successfully grabbed new LastFM SessionKey");
@@ -257,7 +288,7 @@ bool Lfm::AuthGetSession(const std::string &token) {
 }
 
 string Lfm::SearchTracks(const std::string &title, const std::string &artist) const {
-    if (!enabled_) return "";
+    if (!valid_) return "";
 
     string read_buffer;
 
@@ -360,7 +391,10 @@ string Lfm::SearchTracks(const std::string &title, const std::string &artist) co
 
 bool Lfm::UpdateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
                            const uint64_t &duration) const {
-    if (!enabled_) return false;
+
+    // If LFM is disabled for any reason just return true so we don't keep attempting to scrobble or set now playing
+    if (!valid_  || !enabled_) return true;
+
     const string url = "https://ws.audioscrobbler.com/2.0/";
     string body;
     const string dur = to_string(duration);
@@ -423,7 +457,9 @@ bool Lfm::UpdateNowPlaying(const std::string &title, const std::string &artist, 
 
 bool Lfm::scrobble(const std::string &title, const std::string &artist, const std::string &album,
                    const uint64_t &start) const {
-    if (!enabled_) return false;
+
+    // If LFM is disabled for any reason just return true so we don't keep attempting to scrobble or set now playing
+    if (!valid_  || !enabled_) return true;
 
     const string ts = to_string(start);
     const string art = UrlEncode(artist, logger_);
@@ -483,4 +519,22 @@ bool Lfm::scrobble(const std::string &title, const std::string &artist, const st
     }
     if (logger_) logger_->warn("Failed to scrobble track: {}", read_buffer);
     return false;
+}
+
+bool Lfm::GetState() const {
+    return enabled_;
+}
+
+std::wstring Lfm::GetReason() const {
+    if (!valid_) {
+        return L"Invalid API Credentials!";
+    }
+    if (!enabled_) {
+        return L"LastFM disabled";
+    }
+    return L"LastFM active";
+}
+
+void Lfm::toggle() {
+    enabled_ = !enabled_;
 }

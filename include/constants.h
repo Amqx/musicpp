@@ -8,14 +8,14 @@
 #include <string>
 #include <chrono>
 
-constexpr std::wstring kVersion = L"1.1.2";
+const std::wstring kVersion = L"1.1.2";
 
 // Searches and Matching
 constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
 constexpr int kMinSubstrLen = 5; // Minimum number of characters to enable the str inside other str match
-constexpr std::string kNumSearchResults = "5"; // How many results spotify/ last.fm should return
-constexpr std::wstring kDefaultImage = L"default";
-constexpr std::wstring kUnknownSource = L"unknown";
+const std::string kNumSearchResults = "5"; // How many results spotify/ last.fm should return
+const std::wstring kDefaultImage = L"default";
+const std::wstring kUnknownSource = L"unknown";
 
 // Curl requests
 constexpr long kCurlTimeout = 10; // How long requests should wait before timing out
@@ -28,6 +28,8 @@ constexpr int kMaxFiles = 10; // Max number of log files at one time
 // Main loop
 constexpr int kLoopRefreshInterval = 5000; // How many milliseconds between each metadata/ discord refresh
 #define IDI_APPICON 101 // image
+constexpr int kTrayMaxStrLen = 25;
+// Max length of any string on the tray tool tip, DO NOT SET IT UNDER 10 OR YOU WILL HAVE TO CHANGE stringutils.cpp:Truncate(const wstring& input)!
 
 // Regions
 const std::vector<std::string> kRegionList = {
@@ -45,7 +47,7 @@ const std::vector<std::string> kRegionList = {
     "tc", "th", "tj", "tm", "tn", "tr", "tt", "tw", "ua", "ug",
     "us", "uy", "uz", "vc", "ve", "vg", "vn", "za"
 }; // All valid Apple Music Regions
-constexpr auto kDefaultRegion = "ca"; // Default region
+const std::string kDefaultRegion = "ca"; // Default region
 
 // Spotify
 // Three-way matches weight mixing - These should add up to 1
@@ -62,9 +64,10 @@ constexpr int kMaxSetNowPlayingAttempts = 3; // Max tries to set last.fm's now p
 constexpr int kLfmMinTime = 30; // Min time for a song to be considered for scrobbling
 constexpr double kLfmPercentage = 0.75; // Min percentage for a song to be scrobbled
 constexpr int kLfmElapsedTime = 240; // Min time before a song is force scrobbled
+const std::string kLfmStateKey = "config:lastfm";
 
 // Apple Music Web Scraper
-constexpr std::string kTargetSize = "800x800bb-60";
+const std::string kTargetSize = "800x800bb-60";
 // Apple Music scraping target image size - I recommend keeping it at this
 
 // Discord
@@ -72,6 +75,7 @@ constexpr std::string kTargetSize = "800x800bb-60";
 constexpr uint64_t kDiscordApikey = 1358389458956976128; // Discord application api key
 constexpr int kDiscordMaxStrLen = 128; // The max length of a string in a Discord activity is 128 - do not change!
 constexpr std::chrono::milliseconds kDiscordRefreshInterval(10); // Recommended Discord value
+const std::string kDiscordStateKey = "config:discord";
 
 // Database Keys
 constexpr char kRegionDbKey[] = "config:region";

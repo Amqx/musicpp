@@ -6,7 +6,7 @@
 #define MUSICPP_LFM_H
 
 #include <string>
-#include "utils.h"
+#include <leveldb/db.h>
 
 namespace spdlog {
     class logger;
@@ -14,7 +14,7 @@ namespace spdlog {
 
 class Lfm {
 public:
-    Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger *logger = nullptr);
+    Lfm(const std::string &apikey, const std::string &apisecret, leveldb::DB *db, spdlog::logger *logger = nullptr);
 
     ~Lfm();
 
@@ -31,14 +31,23 @@ public:
     bool scrobble(const std::string &title, const std::string &artist, const std::string &album,
                   const uint64_t &start) const;
 
+    [[nodiscard]] bool GetState() const;
+
+    [[nodiscard]] std::wstring GetReason() const;
+
+    void toggle();
+
 private:
     spdlog::logger *logger_;
+    leveldb::DB *db_;
 
     std::string session_key_;
     std::string apikey_;
     std::string apisecret_;
 
     uint64_t token_validity_;
+
+    bool valid_;
 
     bool enabled_;
 

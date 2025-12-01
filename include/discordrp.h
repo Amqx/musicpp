@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <thread>
+#include <leveldb/db.h>
 #include "discordpp.h"
 #include "mediaPlayer.h"
 
@@ -18,7 +19,7 @@ using namespace std;
 
 class Discordrp {
 public:
-    Discordrp(MediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger = nullptr);
+    Discordrp(MediaPlayer *player, const uint64_t &apikey, leveldb::DB *db, spdlog::logger *logger = nullptr);
 
     ~Discordrp();
 
@@ -28,13 +29,19 @@ public:
 
     void update() const;
 
+    void toggle();
+
+    [[nodiscard]] bool GetState() const;
+
 private:
     spdlog::logger *logger_;
+    leveldb::DB *db_;
     atomic<bool> running_{false};
     thread refresh_thread_;
     uint64_t client_id_;
     MediaPlayer *apple_music_;
     shared_ptr<discordpp::Client> client_ = std::make_shared<discordpp::Client>();
+    bool enabled_;
 
     void RefreshLoop() const;
 };

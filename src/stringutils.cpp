@@ -293,3 +293,11 @@ xmlNodePtr FindMatchingListItem(const xmlNodePtr &node, const std::string &title
     }
     return nullptr;
 }
+
+wstring Truncate(const wstring& input) {
+    if (input.length() < kTrayMaxStrLen) return input;
+
+    const int len = input.length();
+
+    return input.substr(0, kTrayMaxStrLen - 10) + L"..." + input.substr(len - 7);
+}
