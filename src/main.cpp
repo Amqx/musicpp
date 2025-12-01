@@ -348,7 +348,8 @@ namespace {
         ctx.scraper = std::make_unique<Amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
-        ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.db.get(), ctx.logger.get());
+        ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.db.get(),
+                                           ctx.logger.get());
         if (ctx.logger) {
             ctx.logger->info("LastFM initialized");
         }
@@ -403,7 +404,7 @@ namespace {
 
         ctx->last_tip = tip;
 
-        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: \n{}\n", ConvertWString(tip));
+        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: \n{}", ConvertWString(tip));
 
         lstrcpynW(ctx->nid.szTip, tip.c_str(), ARRAYSIZE(ctx->nid.szTip));
 
@@ -412,7 +413,7 @@ namespace {
         Shell_NotifyIcon(NIM_MODIFY, &ctx->nid);
     }
 
-    void CopyToClipboard(const AppContext *ctx, const std::wstring& text) {
+    void CopyToClipboard(const AppContext *ctx, const std::wstring &text) {
         if (!OpenClipboard(nullptr)) {
             if (ctx->logger) ctx->logger->error("Failed to open clipboard for text: {}", ConvertWString(text));
             return;
@@ -422,7 +423,8 @@ namespace {
         const size_t bytes = (text.size() + 1) * sizeof(wchar_t);
         const HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, bytes);
         if (!hMem) {
-            if (ctx->logger) ctx->logger->error("Failed to allocate memory for clipboard text: {}", ConvertWString(text));
+            if (ctx->logger) ctx->logger->error("Failed to allocate memory for clipboard text: {}",
+                                                ConvertWString(text));
             CloseClipboard();
             return;
         }
@@ -510,15 +512,19 @@ namespace {
                     if (const HMENU hMenu = CreatePopupMenu()) {
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, TEXT("MusicPP"));
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-                        if (ctx->player->GetState()) {
+                        const wstring title = ctx->player->GetTitle();
+                        const wstring artist = ctx->player->GetArtist();
+                        const wstring album = ctx->player->GetAlbum();
+                        if (ctx->player->HasActiveSession() && !title.empty() && !artist.empty() && !album.empty()) {
                             AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Now Playing");
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, Truncate(ctx->player->GetTitle()).c_str());
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, Truncate(ctx->player->GetArtist()).c_str());
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, Truncate(ctx->player->GetAlbum()).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, Truncate(title).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, Truncate(artist).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, Truncate(album).c_str());
                             AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         }
 
-                        const wstring discord_state = ctx->discord->GetState() ? L"Discord active" : L"Discord disabled";
+                        const wstring discord_state =
+                                ctx->discord->GetState() ? L"Discord active" : L"Discord disabled";
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, discord_state.c_str());
                         AppendMenu(hMenu, MF_STRING, ID_TRAY_DISCORD_TOGGLE, TEXT("Toggle Discord"));
 

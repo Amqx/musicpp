@@ -395,9 +395,8 @@ bool MediaPlayer::UpdateMetadata(
 
     if (album_artist_value.empty() || track_title.empty()) {
         if (logger_) {
-            logger_->debug("albumArtist or title empty; assuming nothing is playing and resetting");
+            logger_->debug("albumArtist or title empty; assuming nothing is playing");
         }
-        reset();
         return false;
     }
 

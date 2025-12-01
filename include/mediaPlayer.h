@@ -69,6 +69,8 @@ public:
 
     [[nodiscard]] bool GetState() const;
 
+    [[nodiscard]] bool HasActiveSession() const;
+
     [[nodiscard]] [[nodiscard]] uint64_t GetPauseTimer() const;
 
     [[nodiscard]] [[nodiscard]] uint64_t GetDurationSeconds() const;
@@ -113,8 +115,6 @@ private:
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
 
     void FindRunning();
-
-    [[nodiscard]] bool HasActiveSession() const;
 
     void UpdatePlaybackState(
         const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackInfo &info);

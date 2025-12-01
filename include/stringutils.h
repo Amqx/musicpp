@@ -43,6 +43,6 @@ bool TrackMatches(const xmlNodePtr &li_node, const std::string &target_title, co
 
 xmlNodePtr FindMatchingListItem(const xmlNodePtr &node, const std::string &title, const std::string &artist);
 
-std::wstring Truncate(const std::wstring& input);
+std::wstring Truncate(const std::wstring &input);
 
 #endif //MUSICPP_STRINGUTILS_H

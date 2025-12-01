@@ -56,7 +56,8 @@ Discordrp::~Discordrp() {
 }
 
 void Discordrp::update() const {
-    if (!apple_music_->GetTitle().empty() && !apple_music_->GetArtist().empty() && !apple_music_->GetAlbum().empty() && enabled_) {
+    if (!apple_music_->GetTitle().empty() && !apple_music_->GetArtist().empty() && !apple_music_->GetAlbum().empty() &&
+        enabled_) {
         discordpp::Activity activity;
 
         const string title = DiscordBounds(apple_music_->GetTitle(), "Unknown Song");

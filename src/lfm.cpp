@@ -391,9 +391,8 @@ string Lfm::SearchTracks(const std::string &title, const std::string &artist) co
 
 bool Lfm::UpdateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
                            const uint64_t &duration) const {
-
     // If LFM is disabled for any reason just return true so we don't keep attempting to scrobble or set now playing
-    if (!valid_  || !enabled_) return true;
+    if (!valid_ || !enabled_) return true;
 
     const string url = "https://ws.audioscrobbler.com/2.0/";
     string body;
@@ -457,9 +456,8 @@ bool Lfm::UpdateNowPlaying(const std::string &title, const std::string &artist, 
 
 bool Lfm::scrobble(const std::string &title, const std::string &artist, const std::string &album,
                    const uint64_t &start) const {
-
     // If LFM is disabled for any reason just return true so we don't keep attempting to scrobble or set now playing
-    if (!valid_  || !enabled_) return true;
+    if (!valid_ || !enabled_) return true;
 
     const string ts = to_string(start);
     const string art = UrlEncode(artist, logger_);
