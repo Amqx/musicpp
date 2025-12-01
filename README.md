@@ -31,7 +31,8 @@ configuration flow requires editing the source.
 ## First Run & Configuration
 
 1. Download the latest release [here](https://github.com/Amqx/musicpp/releases/latest) or build from source (
-   instructions below).
+   instructions
+   below).
 2. On first launch (or after reset) you will be prompted in the console for the API keys above.
 3. After 3 seconds the console closes and MusicPP keeps running from the system tray. Right-click the tray icon to exit.
 

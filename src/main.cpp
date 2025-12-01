@@ -511,7 +511,8 @@ namespace {
 
 
                     if (const HMENU hMenu = CreatePopupMenu()) {
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, TEXT("MusicPP"));
+                        const wstring v = L"MusicPP V" + kVersion;
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         const wstring title = ctx->player->GetTitle();
                         const wstring artist = ctx->player->GetArtist();

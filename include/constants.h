@@ -8,7 +8,7 @@
 #include <string>
 #include <chrono>
 
-const std::wstring kVersion = L"1.1.2";
+const std::wstring kVersion = L"1.1.3";
 
 // Searches and Matching
 constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
