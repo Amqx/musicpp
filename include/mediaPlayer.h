@@ -6,23 +6,12 @@
 #define MUSICPP_MEDIAPLAYER_H
 
 #include <string>
-#include <chrono>
-#include <limits>
 #include <winrt/windows.media.control.h>
-#include <winrt/base.h>
-#include <winrt/windows.foundation.collections.h>
-#include <spotify.h>
-#include <imgur.h>
-#include <amscraper.h>
-#include "leveldb/db.h"
-#include <lfm.h>
-
-// BEFORE CHANGING THESE, PLEASE READ README.md FOR MORE INFO. SOME OF THESE VALUES
-// CANNOT BE CHANGED BELOW A CERTAIN VALUE AND WILL CAUSE INVALID SCROBBLES
-
-constexpr int kLfmMinTime = 30;
-constexpr double kLfmPercentage = 0.75;
-constexpr int kLfmElapsedTime = 240;
+#include <leveldb/db.h>
+#include "spotify.h"
+#include "imgur.h"
+#include "amscraper.h"
+#include "lfm.h"
 
 namespace spdlog {
     class logger;
@@ -43,50 +32,50 @@ struct ArtworkLog {
     bool spotify_used = false;
     bool imgur_used = false;
     bool cache_written = false;
-    bool AM_link_available = false;
+    bool am_link_available = false;
     bool lastfm_link_available = false;
-    bool Spotify_link_available = false;
+    bool spotify_link_available = false;
     std::string db_url;
     std::string final_url;
     std::string final_source;
 };
 
-class mediaPlayer {
+class MediaPlayer {
 public:
-    mediaPlayer(amscraper *scraper, SpotifyAPI *sapi, ImgurAPI *iapi, lfm *lastfm, leveldb::DB *database,
+    MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
                 spdlog::logger *logger = nullptr);
 
-    ~mediaPlayer();
+    ~MediaPlayer();
 
-    wstring getTitle();
+    [[nodiscard]] wstring GetTitle();
 
-    wstring getArtist();
+    [[nodiscard]] wstring GetArtist();
 
-    wstring getAlbum();
+    [[nodiscard]] wstring GetAlbum();
 
-    wstring getImage();
+    [[nodiscard]] wstring GetImage();
 
-    wstring getImageSource();
+    [[nodiscard]] wstring GetImageSource();
 
-    wstring getAMLink();
+    [[nodiscard]] wstring GetAmLink();
 
-    wstring getLastFMLink();
+    [[nodiscard]] wstring GetLastFmLink();
 
-    wstring getSpotifyLink();
+    [[nodiscard]] wstring GetSpotifyLink();
 
-    uint64_t getStartTS() const;
+    [[nodiscard]] uint64_t GetStartTs() const;
 
-    uint64_t getEndTS() const;
+    [[nodiscard]] uint64_t GetEndTs() const;
 
-    bool getState() const;
+    [[nodiscard]] bool GetState() const;
 
-    uint64_t getPauseTimer() const;
+    [[nodiscard]] [[nodiscard]] uint64_t GetPauseTimer() const;
 
-    uint64_t getDurationSeconds() const;
+    [[nodiscard]] [[nodiscard]] uint64_t GetDurationSeconds() const;
 
-    uint64_t getElapsedSeconds() const;
+    [[nodiscard]] [[nodiscard]] uint64_t GetElapsedSeconds() const;
 
-    void getInfo();
+    void UpdateInfo();
 
     void pause();
 
@@ -94,73 +83,70 @@ public:
 
     void reset();
 
-    void printInfo() const;
+    void PrintInfo() const;
 
 private:
-    leveldb::DB *db;
-    wstring title;
-    wstring artist;
-    wstring album;
-    wstring image;
-    wstring spotify_link;
-    wstring amlink;
-    wstring lastfmlink;
-    uint64_t totalTime = std::numeric_limits<uint64_t>::max();
-    uint64_t start_ts = std::numeric_limits<uint64_t>::max();
-    uint64_t end_ts = std::numeric_limits<uint64_t>::max();
-    uint64_t pauseTime = std::numeric_limits<uint64_t>::max();
-    bool playing = false;
-    bool scrobbled = false;
-    bool setNowPlaying = false;
-    wstring image_source;
-    SpotifyAPI *spotify_client;
-    ImgurAPI *imgur_client;
-    amscraper *scraper;
-    spdlog::logger *logger;
-    lfm *lastfm_client;
+    leveldb::DB *db_;
+    wstring title_;
+    wstring artist_;
+    wstring album_;
+    wstring image_;
+    wstring spotify_link_;
+    wstring amlink_;
+    wstring lastfmlink_;
+    uint64_t total_time_ = std::numeric_limits<uint64_t>::max();
+    uint64_t start_ts_ = std::numeric_limits<uint64_t>::max();
+    uint64_t end_ts_ = std::numeric_limits<uint64_t>::max();
+    uint64_t pause_time_ = std::numeric_limits<uint64_t>::max();
+    bool playing_ = false;
+    bool scrobbled_ = false;
+    bool set_now_playing_ = false;
+    wstring image_source_;
+    SpotifyApi *spotify_client_;
+    ImgurApi *imgur_client_;
+    Amscraper *scraper_;
+    spdlog::logger *logger_;
+    Lfm *lastfm_client_;
+    int scrobbleattempts_ = 0;
+    int nowplayingattempts_ = 0;
+    Windows::Media::Control::GlobalSystemMediaTransportControlsSession session_ = nullptr;
+    Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
 
-    int scrobbleattempts = 0;
-    int nowplayingattempts = 0;
+    void FindRunning();
 
+    [[nodiscard]] bool HasActiveSession() const;
 
-    Windows::Media::Control::GlobalSystemMediaTransportControlsSession session = nullptr;
-    Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm =
-            Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
-
-    void findRunning();
-
-    bool hasActiveSession() const;
-
-    void updatePlaybackState(
+    void UpdatePlaybackState(
         const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackInfo &info);
 
-    void updateTimeline(
+    void UpdateTimeline(
         const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties &info);
 
-    bool updateMetadata(
+    bool UpdateMetadata(
         const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties &properties);
 
-    void loadDBImage(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+    void LoadDbImage(const uint64_t &curr_time, const string &song_key, ArtworkLog &log);
 
-    void loadAMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+    void LoadAmLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log);
 
-    void loadLastFMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+    void LoadLastFmLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log);
 
-    void loadSpotifyLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo);
+    void LoadSpotifyLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log);
 
-    void fetchArtworkAM(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
-                        const string &salbum, ArtworkLog &logInfo);
+    void FetchArtworkAm(const uint64_t &curr_time, const string &song_key, const string &stitle, const string &sartist,
+                        const string &salbum, ArtworkLog &log);
 
-    void fetchLastFMLink(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
-                         ArtworkLog &logInfo);
+    void FetchLastFmLink(const uint64_t &curr_time, const string &song_key, const string &stitle, const string &sartist,
+                         ArtworkLog &log);
 
-    void fetchArtworkSpotify(const time_t &currTime, const string &songKey, const string &stitle, const string &sartist,
-                             const string &salbum, ArtworkLog &logInfo);
+    void FetchArtworkSpotify(const uint64_t &curr_time, const string &song_key, const string &stitle,
+                             const string &sartist,
+                             const string &salbum, ArtworkLog &log);
 
-    void fetchArtworkImgur(const time_t &currTime, const string &songKey, const IRandomAccessStreamReference &thumb,
-                           ArtworkLog &logInfo);
+    void FetchArtworkImgur(const uint64_t &curr_time, const string &song_key, const IRandomAccessStreamReference &thumb,
+                           ArtworkLog &log);
 
-    void log_artwork(const ArtworkLog &a) const;
+    void log_artwork(const ArtworkLog &log) const;
 };
 
 

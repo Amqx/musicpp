@@ -2,666 +2,668 @@
 // Created by Jonathan on 25-Sep-25.
 //
 
-#include <mediaPlayer.h>
+
 #include <iostream>
 #include <fcntl.h>
-#include <spotify.h>
-#include <timeutils.h>
 #include <leveldb/db.h>
-#include <stringutils.h>
+#include <winrt/windows.media.control.h>
+#include <winrt/base.h>
+#include <spdlog/spdlog.h>
+// ReSharper disable once CppUnusedIncludeDirective - Needed for get() deduced types
+#include <winrt/windows.foundation.collections.h>
+#include "mediaPlayer.h"
+#include "constants.h"
+#include "spotify.h"
+#include "timeutils.h"
+#include "stringutils.h"
 
-mediaPlayer::mediaPlayer(amscraper *scraper, SpotifyAPI *sapi, ImgurAPI *iapi, lfm *lastfm, leveldb::DB *database,
+MediaPlayer::MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
                          spdlog::logger *logger) {
-    this->scraper = scraper;
-    this->spotify_client = sapi;
-    this->imgur_client = iapi;
-    this->db = database;
-    this->logger = logger;
-    this->lastfm_client = lastfm;
+    this->scraper_ = scraper;
+    this->spotify_client_ = sapi;
+    this->imgur_client_ = iapi;
+    this->db_ = database;
+    this->logger_ = logger;
+    this->lastfm_client_ = lastfm;
 
     init_apartment();
-    if (smtcsm != nullptr) {
-        if (this->logger) this->logger->debug("SMTC Session Manager initialized");
-        findRunning();
-        if (session != nullptr) {
-            if (this->logger) this->logger->info("Apple Music session found at construction; calling getInfo()");
-            getInfo();
+    smtcsm_ = Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+    if (smtcsm_ != nullptr) {
+        if (this->logger_) this->logger_->debug("SMTC Session Manager initialized");
+        FindRunning();
+        if (session_ != nullptr) {
+            if (this->logger_) this->logger_->info("Apple Music session found at construction; calling getInfo()");
+            UpdateInfo();
         } else {
-            if (this->logger) this->logger->info("No Apple Music session found at construction");
+            if (this->logger_) this->logger_->info("No Apple Music session found at construction");
         }
-    } else if (this->logger) {
-        this->logger->error("SMTC Session Manager is null; media controls will not work");
+    } else if (this->logger_) {
+        this->logger_->error("SMTC Session Manager is null; media controls will not work");
     }
 }
 
-mediaPlayer::~mediaPlayer() {
-    this->session = nullptr;
+MediaPlayer::~MediaPlayer() {
+    this->session_ = nullptr;
     uninit_apartment();
-    if (this->logger) {
-        logger->info("mediaPlayer Killed");
+    if (this->logger_) {
+        logger_->info("mediaPlayer Killed");
     }
 }
 
-wstring mediaPlayer::getTitle() {
-    return this->title;
+wstring MediaPlayer::GetTitle() {
+    return this->title_;
 }
 
-wstring mediaPlayer::getArtist() {
-    return this->artist;
+wstring MediaPlayer::GetArtist() {
+    return this->artist_;
 }
 
-wstring mediaPlayer::getAlbum() {
-    return this->album;
+wstring MediaPlayer::GetAlbum() {
+    return this->album_;
 }
 
-wstring mediaPlayer::getImage() {
-    if (!this->image.empty()) {
-        return this->image;
+wstring MediaPlayer::GetImage() {
+    if (!this->image_.empty()) {
+        return this->image_;
     }
-    return L"default";
+    return kDefaultImage;
 }
 
-wstring mediaPlayer::getAMLink() {
-    return this->amlink;
-}
-
-wstring mediaPlayer::getLastFMLink() {
-    return this->lastfmlink;
-}
-
-wstring mediaPlayer::getSpotifyLink() {
-    return this->spotify_link;
-}
-
-wstring mediaPlayer::getImageSource() {
-    if (this->image_source.empty()) {
-        return L"unknown";
+wstring MediaPlayer::GetImageSource() {
+    if (this->image_source_.empty()) {
+        return kUnknownSource;
     }
-    return this->image_source;
+    return this->image_source_;
 }
 
-uint64_t mediaPlayer::getStartTS() const {
-    return this->start_ts;
+wstring MediaPlayer::GetAmLink() {
+    return this->amlink_;
 }
 
-uint64_t mediaPlayer::getEndTS() const {
-    return this->end_ts;
+wstring MediaPlayer::GetLastFmLink() {
+    return this->lastfmlink_;
 }
 
-bool mediaPlayer::getState() const {
-    return this->playing;
+wstring MediaPlayer::GetSpotifyLink() {
+    return this->spotify_link_;
 }
 
-uint64_t mediaPlayer::getPauseTimer() const {
-    return this->pauseTime;
+uint64_t MediaPlayer::GetStartTs() const {
+    return this->start_ts_;
 }
 
-uint64_t mediaPlayer::getDurationSeconds() const {
-    return totalTime;
+uint64_t MediaPlayer::GetEndTs() const {
+    return this->end_ts_;
 }
 
-uint64_t mediaPlayer::getElapsedSeconds() const {
-    if (this->start_ts == INVALID_TIME) {
+bool MediaPlayer::GetState() const {
+    return this->playing_;
+}
+
+uint64_t MediaPlayer::GetPauseTimer() const {
+    return this->pause_time_;
+}
+
+uint64_t MediaPlayer::GetDurationSeconds() const {
+    return total_time_;
+}
+
+uint64_t MediaPlayer::GetElapsedSeconds() const {
+    if (this->start_ts_ == kInvalidTime) {
         return 0;
     }
 
-    uint64_t referenceTime;
-    if (!this->playing && this->pauseTime != INVALID_TIME) {
-        referenceTime = this->pauseTime;
+    uint64_t reference_time;
+    if (!this->playing_ && this->pause_time_ != kInvalidTime) {
+        reference_time = this->pause_time_;
     } else {
-        referenceTime = unix_seconds_now();
+        reference_time = UnixSecondsNow();
     }
 
-    if (referenceTime <= this->start_ts) {
+    if (reference_time <= this->start_ts_) {
         return 0;
     }
 
-    uint64_t elapsed = referenceTime - this->start_ts;
-    uint64_t duration = getDurationSeconds();
-    if (duration > 0 && elapsed > duration) {
+    uint64_t elapsed = reference_time - this->start_ts_;
+    if (const uint64_t duration = GetDurationSeconds(); duration > 0 && elapsed > duration) {
         elapsed = duration;
     }
     return elapsed;
 }
 
-void mediaPlayer::getInfo() {
-    if (!smtcsm) {
-        smtcsm = Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
-        if (!smtcsm) {
-            if (logger) {
-                logger->error("Failed to init SMTCSM! Nothing will work");
+void MediaPlayer::UpdateInfo() {
+    if (!smtcsm_) {
+        smtcsm_ = Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+        if (!smtcsm_) {
+            if (logger_) {
+                logger_->error("Failed to init SMTCSM! Nothing will work");
             }
             reset();
             return;
         }
-        if (logger) {
-            logger->info("Managed to revive SMTCSM. Tracking started");
+        if (logger_) {
+            logger_->info("Managed to revive SMTCSM. Tracking started");
         }
     }
-    findRunning();
-    if (!hasActiveSession()) {
+    FindRunning();
+    if (!HasActiveSession()) {
         reset();
-        if (logger) {
-            logger->debug("getInfo called but no Apple Music session found; resetting");
+        if (logger_) {
+            logger_->debug("getInfo called but no Apple Music session found; resetting");
         }
         return;
     }
 
     try {
-        updatePlaybackState(session.GetPlaybackInfo());
-        updateTimeline(session.GetTimelineProperties());
+        UpdatePlaybackState(session_.GetPlaybackInfo());
+        UpdateTimeline(session_.GetTimelineProperties());
     } catch (exception &e) {
-        if (logger) {
-            logger->warn("Failed to update playback state: {}", e.what());
+        if (logger_) {
+            logger_->warn("Failed to update playback state: {}", e.what());
         }
         reset();
-        session = nullptr;
+        session_ = nullptr;
         return;
     }
 
-    wstring oldTitle = title;
-    wstring oldAlbum = album;
-    wstring oldArtist = artist;
+    wstring old_title = title_;
+    wstring old_album = album_;
+    wstring old_artist = artist_;
 
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties properties{nullptr};
 
     try {
-        properties = session.TryGetMediaPropertiesAsync().get();
+        properties = session_.TryGetMediaPropertiesAsync().get();
     } catch (exception &e) {
-        if (logger) {
-            logger->warn("Failed to update get media properties: {}", e.what());
+        if (logger_) {
+            logger_->warn("Failed to update get media properties: {}", e.what());
         }
         reset();
-        session = nullptr;
+        session_ = nullptr;
         return;
     }
 
-    if (!updateMetadata(properties)) {
+    if (!UpdateMetadata(properties)) {
         reset();
         return;
     }
 
-    const string stitle = convertWString(this->title);
-    const string sartist = convertWString(artist);
-    const string salbum = convertWString(album);
-    const time_t startTime = this->start_ts;
-    const time_t duration = getDurationSeconds();
+    const string stitle = ConvertWString(this->title_);
+    const string sartist = ConvertWString(artist_);
+    const string salbum = ConvertWString(album_);
+    const auto start_time = this->start_ts_;
+    const auto duration = GetDurationSeconds();
 
-    if (!(oldTitle != title || oldAlbum != album || oldArtist != artist)) {
-        if (const time_t elapsedTime = getElapsedSeconds();
-            !scrobbled && totalTime > kLfmMinTime && ((
-                static_cast<double>(elapsedTime) / static_cast<double>(this->totalTime) >=
-                kLfmPercentage || elapsedTime > kLfmElapsedTime))) {
-            std::thread([this, stitle, sartist, salbum, startTime] {
-                if (scrobbleattempts < 3) {
-                    if (lastfm_client->scrobble(stitle, sartist, salbum, startTime)) {
-                        this->scrobbled = true;
+    if (!(old_title != title_ || old_album != album_ || old_artist != artist_)) {
+        if (const auto elapsed_time = GetElapsedSeconds();
+            !scrobbled_ && total_time_ > kLfmMinTime && ((
+                static_cast<double>(elapsed_time) / static_cast<double>(this->total_time_) >=
+                kLfmPercentage || elapsed_time > kLfmElapsedTime))) {
+            std::thread([this, stitle, sartist, salbum, start_time] {
+                if (scrobbleattempts_ < kMaxScrobbleAttempts) {
+                    if (lastfm_client_->scrobble(stitle, sartist, salbum, start_time)) {
+                        this->scrobbled_ = true;
                     };
-                    scrobbleattempts += 1;
+                    scrobbleattempts_ += 1;
                 } else {
-                    this->scrobbled = true;
+                    this->scrobbled_ = true;
                 }
             }).detach();
         }
         return;
     }
 
-    const auto currTime = unix_seconds_now();
+    const auto curr_time = UnixSecondsNow();
 
-    if (logger)
-        logger->info("Track changed: '{}' by '{}' on '{}'",
-                     convertWString(this->title),
-                     convertWString(this->artist),
-                     convertWString(this->album));
+    if (logger_)
+        logger_->info("Track changed: '{}' by '{}' on '{}'",
+                      ConvertWString(this->title_),
+                      ConvertWString(this->artist_),
+                      ConvertWString(this->album_));
 
-    this->image.clear();
-    this->image_source.clear();
-    this->amlink.clear();
-    this->spotify_link.clear();
-    this->lastfmlink.clear();
-    this->setNowPlaying = false;
-    this->scrobbled = false;
-    this->scrobbleattempts = 0;
-    this->nowplayingattempts = 0;
+    this->image_.clear();
+    this->image_source_.clear();
+    this->amlink_.clear();
+    this->spotify_link_.clear();
+    this->lastfmlink_.clear();
+    this->set_now_playing_ = false;
+    this->scrobbled_ = false;
+    this->scrobbleattempts_ = 0;
+    this->nowplayingattempts_ = 0;
 
-    ArtworkLog logInfo;
-    const string songKey = sanitizeKeys(stitle) + '|' + sanitizeKeys(sartist) + '|' + sanitizeKeys(salbum);
+    ArtworkLog log;
+    const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
 
-    if (!setNowPlaying && playing) {
+    if (!set_now_playing_ && playing_) {
         thread([this, stitle, sartist, salbum, duration] {
-            if (nowplayingattempts < 3) {
-                if (lastfm_client->updateNowPlaying(stitle, sartist, salbum, duration)) {
-                    this->setNowPlaying = true;
+            if (nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
+                if (lastfm_client_->UpdateNowPlaying(stitle, sartist, salbum, duration)) {
+                    this->set_now_playing_ = true;
                 };
-                nowplayingattempts += 1;
+                nowplayingattempts_ += 1;
             } else {
-                this->setNowPlaying = true;
+                this->set_now_playing_ = true;
             }
         }).detach();
     }
 
-    if (db) {
-        loadDBImage(currTime, songKey, logInfo);
-        loadAMLink(currTime, songKey, logInfo);
-        loadLastFMLink(currTime, songKey, logInfo);
-        loadSpotifyLink(currTime, songKey, logInfo);
+    if (db_) {
+        LoadDbImage(curr_time, song_key, log);
+        LoadAmLink(curr_time, song_key, log);
+        LoadLastFmLink(curr_time, song_key, log);
+        LoadSpotifyLink(curr_time, song_key, log);
     }
 
-    fetchArtworkAM(currTime, songKey, stitle, sartist, salbum, logInfo);
-    fetchLastFMLink(currTime, songKey, stitle, sartist, logInfo);
-    fetchArtworkSpotify(currTime, songKey, stitle, sartist, salbum, logInfo);
-    fetchArtworkImgur(currTime, songKey, properties.Thumbnail(), logInfo);
+    FetchArtworkAm(curr_time, song_key, stitle, sartist, salbum, log);
+    FetchLastFmLink(curr_time, song_key, stitle, sartist, log);
+    FetchArtworkSpotify(curr_time, song_key, stitle, sartist, salbum, log);
+    FetchArtworkImgur(curr_time, song_key, properties.Thumbnail(), log);
 
-    logInfo.final_source = convertWString(this->image_source);
-    logInfo.final_url = convertWString(this->image);
+    log.final_source = ConvertWString(this->image_source_);
+    log.final_url = ConvertWString(this->image_);
 
-    log_artwork(logInfo);
+    log_artwork(log);
 }
 
-void mediaPlayer::pause() {
-    this->playing = false;
-    if (this->pauseTime == INVALID_TIME) {
-        this->pauseTime = unix_seconds_now();
+void MediaPlayer::pause() {
+    this->playing_ = false;
+    if (this->pause_time_ == kInvalidTime) {
+        this->pause_time_ = UnixSecondsNow();
     }
-    if (this->logger) {
-        this->logger->debug("Paused playback at ts={}, elapsed={}s.",
-                            this->pauseTime, getElapsedSeconds());
+    if (this->logger_) {
+        this->logger_->debug("Paused playback at ts={}, elapsed={}s.",
+                             this->pause_time_, GetElapsedSeconds());
     }
 }
 
-void mediaPlayer::play() {
-    bool prev_state = this->playing;
-    this->playing = true;
-    this->pauseTime = INVALID_TIME;
-    if (this->logger) {
-        if (prev_state != this->playing) {
-            this->logger->debug("Resumed playback. start_ts={}, end_ts={}.",
-                                this->start_ts, this->end_ts);
+void MediaPlayer::play() {
+    const bool prev_state = this->playing_;
+    this->playing_ = true;
+    this->pause_time_ = kInvalidTime;
+    if (this->logger_) {
+        if (prev_state != this->playing_) {
+            this->logger_->debug("Resumed playback. start_ts={}, end_ts={}.",
+                                 this->start_ts_, this->end_ts_);
         } else {
-            this->logger->debug("Retained playing state");
+            this->logger_->debug("Retained playing state");
         }
     }
 }
 
-void mediaPlayer::reset() {
-    if (this->logger) {
-        this->logger->debug("Resetting mediaPlayer state. Previous track: '{}' by '{}'.",
-                            convertWString(this->title),
-                            convertWString(this->artist));
+void MediaPlayer::reset() {
+    if (this->logger_) {
+        this->logger_->debug("Resetting mediaPlayer state. Previous track: '{}' by '{}'.",
+                             ConvertWString(this->title_),
+                             ConvertWString(this->artist_));
     }
-    this->title = L"";
-    this->artist = L"";
-    this->album = L"";
-    this->image = L"";
-    this->image_source = L"";
-    this->spotify_link = L"";
-    this->amlink = L"";
-    this->lastfmlink = L"";
-    this->start_ts = INVALID_TIME;
-    this->end_ts = INVALID_TIME;
-    this->pauseTime = INVALID_TIME;
-    this->playing = false;
-    this->totalTime = INVALID_TIME;
-    this->scrobbled = false;
-    this->setNowPlaying = false;
-    this->scrobbleattempts = 0;
-    this->nowplayingattempts = 0;
+    this->title_ = L"";
+    this->artist_ = L"";
+    this->album_ = L"";
+    this->image_ = L"";
+    this->image_source_ = L"";
+    this->spotify_link_ = L"";
+    this->amlink_ = L"";
+    this->lastfmlink_ = L"";
+    this->start_ts_ = kInvalidTime;
+    this->end_ts_ = kInvalidTime;
+    this->pause_time_ = kInvalidTime;
+    this->playing_ = false;
+    this->total_time_ = kInvalidTime;
+    this->scrobbled_ = false;
+    this->set_now_playing_ = false;
+    this->scrobbleattempts_ = 0;
+    this->nowplayingattempts_ = 0;
 }
 
-void mediaPlayer::printInfo() const {
+void MediaPlayer::PrintInfo() const {
     wcout << L"Player information" << endl;
     wcout << L"=================================" << endl;
-    wcout << L"Title: " << title << endl;
-    wcout << L"Artist: " << artist << endl;
-    wcout << L"Album: " << album << endl;
-    wcout << L"Image url: " << image << endl;
-    wcout << L"Image source: " << image_source << endl;
-    wcout << L"Spotify link: " << spotify_link << endl;
-    wcout << L"Apple Music link: " << amlink << endl;
-    wcout << L"LastFM link: " << lastfmlink << endl;
-    wcout << L"Start timestamp (UNIX): " << start_ts << endl;
-    wcout << L"End timestamp (UNIX): " << end_ts << endl;
-    wcout << L"Total time: " << totalTime << endl;
-    wcout << L"Currently playing: " << playing << endl;
-    wcout << L"Pause timer (UNIX): " << pauseTime << endl;
+    wcout << L"Title: " << title_ << endl;
+    wcout << L"Artist: " << artist_ << endl;
+    wcout << L"Album: " << album_ << endl;
+    wcout << L"Image url: " << image_ << endl;
+    wcout << L"Image source: " << image_source_ << endl;
+    wcout << L"Spotify link: " << spotify_link_ << endl;
+    wcout << L"Apple Music link: " << amlink_ << endl;
+    wcout << L"LastFM link: " << lastfmlink_ << endl;
+    wcout << L"Start timestamp (UNIX): " << start_ts_ << endl;
+    wcout << L"End timestamp (UNIX): " << end_ts_ << endl;
+    wcout << L"Total time: " << total_time_ << endl;
+    wcout << L"Currently playing: " << playing_ << endl;
+    wcout << L"Pause timer (UNIX): " << pause_time_ << endl;
 }
 
-void mediaPlayer::findRunning() {
-    for (const auto &s: this->smtcsm.GetSessions()) {
+void MediaPlayer::FindRunning() {
+    for (const auto &s: this->smtcsm_.GetSessions()) {
         if (*s.SourceAppUserModelId().c_str() == *L"AppleInc.AppleMusicWin_nzyj5cx40ttqa!App") {
-            this->session = s;
-            if (this->logger) {
-                this->logger->debug("Apple Music session found: {}",
-                                    convertWString(s.SourceAppUserModelId().c_str()));
+            this->session_ = s;
+            if (this->logger_) {
+                this->logger_->debug("Apple Music session found: {}",
+                                     ConvertWString(s.SourceAppUserModelId().c_str()));
             }
             return;
         }
     }
-    if (this->logger) {
-        this->logger->debug("No Apple Music session currently running");
+    if (this->logger_) {
+        this->logger_->debug("No Apple Music session currently running");
     }
-    this->session = nullptr;
+    this->session_ = nullptr;
 }
 
-bool mediaPlayer::hasActiveSession() const {
-    return this->session != nullptr;
+bool MediaPlayer::HasActiveSession() const {
+    return this->session_ != nullptr;
 }
 
-void mediaPlayer::updatePlaybackState(
+void MediaPlayer::UpdatePlaybackState(
     const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackInfo &info) {
     auto status = info.PlaybackStatus();
-    if (logger) logger->debug("Playback Status: {}", static_cast<int>(status));
+    if (logger_) logger_->debug("Playback Status: {}", static_cast<int>(status));
     if (status == Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
-        bool prev_state = playing;
+        const bool prev_state = playing_;
         play();
-        if (!prev_state && logger) {
-            logger->info("Playback transitioned to playing");
+        if (!prev_state && logger_) {
+            logger_->info("Playback transitioned to playing");
         }
     } else {
-        bool prev_state = playing;
+        const bool prev_state = playing_;
         pause();
-        if (prev_state && logger) {
-            logger->info("Playback transitioned to paused/stopped");
+        if (prev_state && logger_) {
+            logger_->info("Playback transitioned to paused/stopped");
         }
     }
 }
 
-void mediaPlayer::updateTimeline(
+void MediaPlayer::UpdateTimeline(
     const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties &info) {
-    auto currTime = unix_seconds_now();
-    auto position = info.Position().count() / 10000000;
-    auto endTime = info.EndTime().count() / 10000000;
-    start_ts = currTime - position;
-    end_ts = currTime + endTime - position;
-    totalTime = end_ts - start_ts;
-    if (logger) {
-        logger->debug("Timeline: pos={}s, end={}s, total={}s, start_ts={}, end_ts={}",
-                      position, endTime, totalTime, start_ts, end_ts);
+    const auto curr_time = UnixSecondsNow();
+    auto position = info.Position().count() / kWindowsTsConversion;
+    auto end_time = info.EndTime().count() / kWindowsTsConversion;
+    start_ts_ = curr_time - position;
+    end_ts_ = start_ts_ + end_time;
+    total_time_ = end_ts_ - start_ts_;
+    if (logger_) {
+        logger_->debug("Timeline: pos={}s, end={}s, total={}s, start_ts={}, end_ts={}",
+                       position, end_time, total_time_, start_ts_, end_ts_);
     }
 }
 
-bool mediaPlayer::updateMetadata(
+bool MediaPlayer::UpdateMetadata(
     const Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties &properties) {
-    wstring albumArtistValue = properties.AlbumArtist().c_str();
-    wstring trackTitle = properties.Title().c_str();
-    this->title = trackTitle;
+    wstring album_artist_value = properties.AlbumArtist().c_str();
+    const wstring track_title = properties.Title().c_str();
+    this->title_ = track_title;
 
-    if (albumArtistValue.empty() || trackTitle.empty()) {
-        if (logger) {
-            logger->debug("albumArtist or title empty; assuming nothing is playing and resetting");
+    if (album_artist_value.empty() || track_title.empty()) {
+        if (logger_) {
+            logger_->debug("albumArtist or title empty; assuming nothing is playing and resetting");
         }
         reset();
         return false;
     }
 
-    size_t sep = albumArtistValue.find(L'\u2014');
+    const size_t sep = album_artist_value.find(L'\u2014');
     if (sep == wstring::npos) {
-        if (logger) {
-            logger->debug("Custom song detected/ no EM dash found");
+        if (logger_) {
+            logger_->debug("Custom song detected/ no EM dash found");
         }
-        album = albumArtistValue;
-        artist = albumArtistValue;
+        album_ = album_artist_value;
+        artist_ = album_artist_value;
         return true;
     }
-    this->artist = albumArtistValue.substr(0, sep - 1);
-    this->album = albumArtistValue.substr(sep + 2);
+    this->artist_ = album_artist_value.substr(0, sep - 1);
+    this->album_ = album_artist_value.substr(sep + 2);
     return true;
 }
 
-void mediaPlayer::loadDBImage(const time_t &currTime, const string &songKey, ArtworkLog &logInfo) {
+void MediaPlayer::LoadDbImage(const uint64_t &curr_time, const string &song_key, ArtworkLog &log) {
     string result;
-    const auto status = db->Get(leveldb::ReadOptions(), songKey, &result);
-    if (!status.ok()) return;
+    if (const auto status = db_->Get(leveldb::ReadOptions(), song_key, &result); !status.ok()) return;
 
-    logInfo.db_hit_image = true;
+    log.db_hit_image = true;
     try {
-        size_t firstSep = result.find('|');
-        if (firstSep == string::npos) {
+        const size_t first_sep = result.find('|');
+        if (first_sep == string::npos) {
             throw invalid_argument("Missing first separator");
         }
 
-        time_t timestamp = stoll(result.substr(0, firstSep));
+        const time_t timestamp = stoll(result.substr(0, first_sep));
 
-        size_t secondSep = result.find('|', firstSep + 1);
+        const size_t second_sep = result.find('|', first_sep + 1);
         string url, source;
-        if (secondSep == string::npos) {
-            url = result.substr(firstSep + 1);
+        if (second_sep == string::npos) {
+            url = result.substr(first_sep + 1);
         } else {
-            url = result.substr(firstSep + 1, secondSep - firstSep - 1);
-            source = result.substr(secondSep + 1);
+            url = result.substr(first_sep + 1, second_sep - first_sep - 1);
+            source = result.substr(second_sep + 1);
         }
 
-        if (currTime - timestamp > 7 * 24 * 60 * 60) {
-            db->Delete(leveldb::WriteOptions(), songKey);
-            logInfo.db_image_expired = true;
-            image_source = L"DB - expired";
+        if (curr_time - timestamp > kDbExpireTime) {
+            db_->Delete(leveldb::WriteOptions(), song_key);
+            log.db_image_expired = true;
+            image_source_ = L"DB - expired";
             return;
         }
 
-        image = convertToWString(url);
+        image_ = ConvertToWString(url);
         if (source.empty()) {
-            image_source = L"DB - unknown";
+            image_source_ = L"DB - unknown";
         } else {
-            image_source = L"DB, " + convertToWString(source);
+            image_source_ = L"DB, " + ConvertToWString(source);
         }
-        logInfo.db_url = url;
+        log.db_url = url;
     } catch (const exception &e) {
-        if (this->logger) {
-            this->logger->warn("DB Image Parse Error for '{}': {}", songKey, e.what());
+        if (this->logger_) {
+            this->logger_->warn("DB Image Parse Error for '{}': {}", song_key, e.what());
         }
-        db->Delete(leveldb::WriteOptions(), songKey);
-        logInfo.db_parse_error = true;
-        this->image.clear();
-        this->image_source.clear();
+        db_->Delete(leveldb::WriteOptions(), song_key);
+        log.db_parse_error = true;
+        this->image_.clear();
+        this->image_source_.clear();
     }
 }
 
-void mediaPlayer::loadAMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo) {
-    const string fullKey = "musicppAM" + songKey;
+void MediaPlayer::LoadAmLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log) {
+    const string full_key = "musicppAM" + song_key;
     string value;
-    const auto status = db->Get(leveldb::ReadOptions(), fullKey, &value);
-    if (!status.ok()) return;
+    if (const auto status = db_->Get(leveldb::ReadOptions(), full_key, &value); !status.ok()) return;
 
-    logInfo.db_hit_amlink = true;
+    log.db_hit_amlink = true;
     try {
-        size_t sep = value.find('|');
+        const size_t sep = value.find('|');
         if (sep == string::npos) {
             throw invalid_argument("Missing AM separator");
         }
 
-        time_t ts = stoll(value.substr(0, sep));
-        string url = value.substr(sep + 1);
+        const time_t ts = stoll(value.substr(0, sep));
+        const string url = value.substr(sep + 1);
 
-        if (currTime - ts > 7 * 24 * 60 * 60) {
-            db->Delete(leveldb::WriteOptions(), fullKey);
-            logInfo.db_amlink_expired = true;
+        if (curr_time - ts > kDbExpireTime) {
+            db_->Delete(leveldb::WriteOptions(), full_key);
+            log.db_amlink_expired = true;
         } else {
-            amlink = convertToWString(url);
-            logInfo.AM_link_available = true;
+            amlink_ = ConvertToWString(url);
+            log.am_link_available = true;
         }
     } catch (exception &e) {
-        if (logger) {
-            logger->warn("DB AM Link Parse Error: {}. Deleting key.", e.what());
+        if (logger_) {
+            logger_->warn("DB AM Link Parse Error: {}. Deleting key.", e.what());
         }
-        db->Delete(leveldb::WriteOptions(), fullKey);
-        logInfo.db_parse_error = true;
-        this->amlink.clear();
+        db_->Delete(leveldb::WriteOptions(), full_key);
+        log.db_parse_error = true;
+        this->amlink_.clear();
     }
 }
 
-void mediaPlayer::loadLastFMLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo) {
-    const string fullKey = "musicppLFM" + songKey;
+void MediaPlayer::LoadLastFmLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log) {
+    const string full_key = "musicppLFM" + song_key;
     string value;
-    const auto status = db->Get(leveldb::ReadOptions(), fullKey, &value);
-    if (!status.ok()) return;
+    if (const auto status = db_->Get(leveldb::ReadOptions(), full_key, &value); !status.ok()) return;
 
-    logInfo.db_hit_lastfmlink = true;
+    log.db_hit_lastfmlink = true;
 
     try {
-        size_t sep = value.find('|');
+        const size_t sep = value.find('|');
         if (sep == string::npos) throw invalid_argument("Missing LastFM separator");
 
-        time_t ts = stoll(value.substr(0, sep));
-        string url = value.substr(sep + 1);
+        const time_t ts = stoll(value.substr(0, sep));
+        const string url = value.substr(sep + 1);
 
-        if (currTime - ts > 7 * 24 * 60 * 60) {
-            db->Delete(leveldb::WriteOptions(), fullKey);
-            logInfo.db_lastfmlink_expired = true;
+        if (curr_time - ts > kDbExpireTime) {
+            db_->Delete(leveldb::WriteOptions(), full_key);
+            log.db_lastfmlink_expired = true;
         } else {
-            lastfmlink = convertToWString(url);
-            logInfo.lastfm_link_available = true;
+            lastfmlink_ = ConvertToWString(url);
+            log.lastfm_link_available = true;
         }
     } catch (exception &e) {
-        if (logger) {
-            logger->warn("DB LastFM Link Parse Error: {}. Deleting Key.", e.what());
+        if (logger_) {
+            logger_->warn("DB LastFM Link Parse Error: {}. Deleting Key.", e.what());
         }
-        db->Delete(leveldb::WriteOptions(), fullKey);
-        logInfo.db_parse_error = true;
+        db_->Delete(leveldb::WriteOptions(), full_key);
+        log.db_parse_error = true;
     }
 }
 
-void mediaPlayer::loadSpotifyLink(const time_t &currTime, const string &songKey, ArtworkLog &logInfo) {
-    const string fullKey = "musicppSP" + songKey;
+void MediaPlayer::LoadSpotifyLink(const uint64_t &curr_time, const string &song_key, ArtworkLog &log) {
+    const string full_key = "musicppSP" + song_key;
     string value;
-    const auto status = db->Get(leveldb::ReadOptions(), fullKey, &value);
-    if (!status.ok()) return;
+    if (const auto status = db_->Get(leveldb::ReadOptions(), full_key, &value); !status.ok()) return;
 
-    logInfo.db_hit_spotifylink = true;
+    log.db_hit_spotifylink = true;
 
     try {
-        size_t sep = value.find('|');
+        const size_t sep = value.find('|');
         if (sep == string::npos) throw invalid_argument("Missing Spotify separator");
 
-        time_t ts = stoll(value.substr(0, sep));
-        string url = value.substr(sep + 1);
+        const time_t ts = stoll(value.substr(0, sep));
+        const string url = value.substr(sep + 1);
 
-        if (currTime - ts > 7 * 24 * 60 * 60) {
-            db->Delete(leveldb::WriteOptions(), fullKey);
-            logInfo.db_spotifylink_expired = true;
+        if (curr_time - ts > kDbExpireTime) {
+            db_->Delete(leveldb::WriteOptions(), full_key);
+            log.db_spotifylink_expired = true;
         } else {
-            spotify_link = convertToWString(url);
-            logInfo.Spotify_link_available = true;
+            spotify_link_ = ConvertToWString(url);
+            log.spotify_link_available = true;
         }
     } catch (exception &e) {
-        if (logger) {
-            logger->warn("DB Spotify Link Parse Error: {}. Deleting key.", e.what());
+        if (logger_) {
+            logger_->warn("DB Spotify Link Parse Error: {}. Deleting key.", e.what());
         }
-        db->Delete(leveldb::WriteOptions(), fullKey);
-        logInfo.db_parse_error = true;
+        db_->Delete(leveldb::WriteOptions(), full_key);
+        log.db_parse_error = true;
     }
 }
 
-void mediaPlayer::fetchArtworkAM(const time_t &currTime, const string &songKey, const string &stitle,
-                                 const string &sartist, const string &salbum, ArtworkLog &logInfo) {
-    if (!scraper) return;
-    if (!image.empty() && !amlink.empty()) return;
-    logInfo.scraper_used = true;
-    searchResult res = scraper->searchTracks(stitle, sartist, salbum);
+void MediaPlayer::FetchArtworkAm(const uint64_t &curr_time, const string &song_key, const string &stitle,
+                                 const string &sartist, const string &salbum, ArtworkLog &log) {
+    if (!scraper_) return;
+    if (!image_.empty() && !amlink_.empty()) return;
+    log.scraper_used = true;
+    const auto [url, image] = scraper_->SearchTracks(stitle, sartist, salbum);
 
-    if (!res.image.empty() && image.empty()) {
-        const string value = to_string(currTime) + "|" + res.image + "|Apple Music";
-        if (db) {
-            db->Put(leveldb::WriteOptions(), songKey, value);
-            logInfo.cache_written = true;
+    if (!image.empty() && image_.empty()) {
+        const string value = to_string(curr_time) + "|" + image + "|Apple Music";
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), song_key, value);
+            log.cache_written = true;
         }
-        image = convertToWString(res.image);
-        image_source = L"Apple Music";
+        image_ = ConvertToWString(image);
+        image_source_ = L"Apple Music";
     }
 
-    if (!res.url.empty()) {
-        const string urlKey = "musicppAM" + songKey;
-        const string value = to_string(currTime) + "|" + res.url;
-        logInfo.AM_link_available = true;
-        if (db) {
-            db->Put(leveldb::WriteOptions(), urlKey, value);
+    if (!url.empty()) {
+        const string url_key = "musicppAM" + song_key;
+        const string value = to_string(curr_time) + "|" + url;
+        log.am_link_available = true;
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), url_key, value);
         }
-        amlink = convertToWString(res.url);
-    }
-}
-
-void mediaPlayer::fetchLastFMLink(const time_t &currTime, const string &songKey, const string &stitle,
-                                  const string &sartist, ArtworkLog &logInfo) {
-    if (!lastfm_client) return;
-    if (!lastfmlink.empty()) return;
-
-    logInfo.lastfm_used = true;
-    string res = lastfm_client->searchTracks(stitle, sartist);
-
-    if (!res.empty()) {
-        const string urlKey = "musicppLFM" + songKey;
-        string value = to_string(currTime) + "|" + res;
-        logInfo.lastfm_link_available = true;
-        if (db) {
-            db->Put(leveldb::WriteOptions(), urlKey, value);
-        }
-        lastfmlink = convertToWString(res);
+        amlink_ = ConvertToWString(url);
     }
 }
 
-void mediaPlayer::fetchArtworkSpotify(const time_t &currTime, const string &songKey, const string &stitle,
-                                      const string &sartist, const string &salbum, ArtworkLog &logInfo) {
-    if (!spotify_client) return;
+void MediaPlayer::FetchLastFmLink(const uint64_t &curr_time, const string &song_key, const string &stitle,
+                                  const string &sartist, ArtworkLog &log) {
+    if (!lastfm_client_) return;
+    if (!lastfmlink_.empty()) return;
+
+    log.lastfm_used = true;
+
+    if (const string res = lastfm_client_->SearchTracks(stitle, sartist); !res.empty()) {
+        const string url_key = "musicppLFM" + song_key;
+        const string value = to_string(curr_time) + "|" + res;
+        log.lastfm_link_available = true;
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), url_key, value);
+        }
+        lastfmlink_ = ConvertToWString(res);
+    }
+}
+
+void MediaPlayer::FetchArtworkSpotify(const uint64_t &curr_time, const string &song_key, const string &stitle,
+                                      const string &sartist, const string &salbum, ArtworkLog &log) {
+    if (!spotify_client_) return;
 
     // should only run if:
     // 1. image is empty
     // 2. lastfm's link is also empty
     // 3. spotify's link is ALSO empty
-    if (!image.empty() && !lastfmlink.empty() && !amlink.empty()) {
+    if (!image_.empty() && !lastfmlink_.empty() && !amlink_.empty()) {
         return;
     }
-    logInfo.spotify_used = true;
-    searchResult res = spotify_client->searchTracks(stitle, sartist, salbum);
+    log.spotify_used = true;
+    const auto [url, image] = spotify_client_->SearchTracks(stitle, sartist, salbum);
 
-    if (!res.image.empty() && image.empty()) {
-        string value = to_string(currTime) + "|" + res.image + "|Spotify";
-        if (db) {
-            db->Put(leveldb::WriteOptions(), songKey, value);
-            logInfo.cache_written = true;
+    if (!image.empty() && image_.empty()) {
+        const string value = to_string(curr_time) + "|" + image + "|Spotify";
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), song_key, value);
+            log.cache_written = true;
         }
-        image = convertToWString(res.image);
-        image_source = L"Spotify";
+        image_ = ConvertToWString(image);
+        image_source_ = L"Spotify";
     }
 
-    if (!res.url.empty()) {
-        const string urlKey = "musicppSP" + songKey;
-        const string value = to_string(currTime) + "|" + res.url;
-        logInfo.Spotify_link_available = true;
-        if (db) {
-            db->Put(leveldb::WriteOptions(), urlKey, value);
+    if (!url.empty()) {
+        const string url_key = "musicppSP" + song_key;
+        const string value = to_string(curr_time) + "|" + url;
+        log.spotify_link_available = true;
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), url_key, value);
         }
-        spotify_link = convertToWString(res.url);
+        spotify_link_ = ConvertToWString(url);
     }
 }
 
-void mediaPlayer::fetchArtworkImgur(const time_t &currTime, const string &songKey,
-                                    const IRandomAccessStreamReference &thumb, ArtworkLog &logInfo) {
-    if (!imgur_client) return;
-    if (!image.empty()) return;
+void MediaPlayer::FetchArtworkImgur(const uint64_t &curr_time, const string &song_key,
+                                    const IRandomAccessStreamReference &thumb, ArtworkLog &log) {
+    if (!imgur_client_) return;
+    if (!image_.empty()) return;
 
-    string url = imgur_client->uploadImage(thumb);
+    const string url = imgur_client_->UploadImage(thumb);
     if (!url.empty() && url != "default") {
-        const string value = to_string(currTime) + "|" + url + "|Imgur";
-        logInfo.imgur_used = true;
-        if (db) {
-            db->Put(leveldb::WriteOptions(), songKey, value);
-            logInfo.cache_written = true;
+        const string value = to_string(curr_time) + "|" + url + "|Imgur";
+        log.imgur_used = true;
+        if (db_) {
+            db_->Put(leveldb::WriteOptions(), song_key, value);
+            log.cache_written = true;
         }
     }
 
-    image = convertToWString(url);
-    if (image == L"default") {
-        image_source = L"none";
+    image_ = ConvertToWString(url);
+    if (image_ == L"default") {
+        image_source_ = L"none";
     } else {
-        image_source = L"Imgur";
+        image_source_ = L"Imgur";
     }
 }
 
-void mediaPlayer::log_artwork(const ArtworkLog &a) const {
-    if (!logger) return;
+void MediaPlayer::log_artwork(const ArtworkLog &log) const {
+    if (!logger_) return;
 
     string flags_str;
 
-    auto append_flag = [&](const char *name, bool value) {
+    auto append_flag = [&](const char *name, const bool value) {
         if (value) {
             if (!flags_str.empty()) flags_str += " ";
             flags_str += name;
@@ -669,35 +671,35 @@ void mediaPlayer::log_artwork(const ArtworkLog &a) const {
     };
 
     // database hits
-    append_flag("db_hit_image", a.db_hit_image);
-    append_flag("db_hit_am", a.db_hit_amlink);
-    append_flag("db_hit_lfm", a.db_hit_lastfmlink);
-    append_flag("db_hit_sp", a.db_hit_spotifylink);
+    append_flag("db_hit_image", log.db_hit_image);
+    append_flag("db_hit_am", log.db_hit_amlink);
+    append_flag("db_hit_lfm", log.db_hit_lastfmlink);
+    append_flag("db_hit_sp", log.db_hit_spotifylink);
 
     // expirations
-    append_flag("img_expired", a.db_image_expired);
-    append_flag("amlink_expired", a.db_amlink_expired);
-    append_flag("lfmlink_expired", a.db_lastfmlink_expired);
-    append_flag("splink_expired", a.db_spotifylink_expired);
+    append_flag("img_expired", log.db_image_expired);
+    append_flag("amlink_expired", log.db_amlink_expired);
+    append_flag("lfmlink_expired", log.db_lastfmlink_expired);
+    append_flag("splink_expired", log.db_spotifylink_expired);
 
     // sources used
-    append_flag("parse_error", a.db_parse_error);
-    append_flag("am_used", a.scraper_used);
-    append_flag("lfm_used", a.lastfm_used);
-    append_flag("spotify_used", a.spotify_used);
-    append_flag("imgur_used", a.imgur_used);
-    append_flag("cache_written", a.cache_written);
+    append_flag("parse_error", log.db_parse_error);
+    append_flag("am_used", log.scraper_used);
+    append_flag("lfm_used", log.lastfm_used);
+    append_flag("spotify_used", log.spotify_used);
+    append_flag("imgur_used", log.imgur_used);
+    append_flag("cache_written", log.cache_written);
 
     // links available
-    append_flag("am_avail", a.AM_link_available);
-    append_flag("lfm_avail", a.lastfm_link_available);
-    append_flag("sp_avail", a.Spotify_link_available);
+    append_flag("am_avail", log.am_link_available);
+    append_flag("lfm_avail", log.lastfm_link_available);
+    append_flag("sp_avail", log.spotify_link_available);
 
-    logger->info(
+    logger_->info(
         R"(ArtworkLog | Flags: [{}] | DB URL: "{}" | Final URL: "{}" | Source: "{}")",
         flags_str.empty() ? "NONE" : flags_str,
-        a.db_url,
-        a.final_url,
-        a.final_source
+        log.db_url,
+        log.final_url,
+        log.final_source
     );
 }

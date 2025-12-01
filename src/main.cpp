@@ -2,31 +2,31 @@
 // Created by Jonathan on 25-Sep-25.
 //
 
-#include <mediaPlayer.h>
-#include <imgur.h>
-#include <spotify.h>
-#include <discordrp.h>
 #include <chrono>
 #include <thread>
-#include <credhelper.h>
 #include <iostream>
 #include <Windows.h>
 #include <conio.h>
-#include "leveldb/db.h"
+#include <leveldb/db.h>
 #include <shlobj_core.h>
 #include <filesystem>
 #include <shellapi.h>
-#include <resource.h>
 #include <sstream>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
-#include <timeutils.h>
-#include <consoleutils.h>
-#include "stringutils.h"
 #include <unordered_set>
 #include <vector>
 #include <iomanip>
-#include <lfm.h>
+#include "lfm.h"
+#include "timeutils.h"
+#include "consoleutils.h"
+#include "stringutils.h"
+#include "constants.h"
+#include "mediaPlayer.h"
+#include "imgur.h"
+#include "spotify.h"
+#include "discordrp.h"
+#include "credhelper.h"
 
 using namespace std;
 
@@ -36,65 +36,53 @@ namespace {
 
         std::shared_ptr<spdlog::logger> logger;
 
-        std::unique_ptr<amscraper> scraper;
+        std::unique_ptr<Amscraper> scraper;
 
-        std::unique_ptr<lfm> lastfm;
+        std::unique_ptr<Lfm> lastfm;
 
-        std::unique_ptr<SpotifyAPI> spotify;
+        std::unique_ptr<SpotifyApi> spotify;
 
-        std::unique_ptr<ImgurAPI> imgur;
+        std::unique_ptr<ImgurApi> imgur;
 
-        std::unique_ptr<mediaPlayer> player;
+        std::unique_ptr<MediaPlayer> player;
 
-        std::unique_ptr<discordrp> discord;
+        std::unique_ptr<Discordrp> discord;
 
         NOTIFYICONDATAW nid{};
 
         HWND hWnd = nullptr;
 
-        wstring lastTip;
+        wstring last_tip;
     };
 
-    constexpr int INTERVAL = 5;
+    UINT g_wm_taskbar_restart = 0;
     constexpr UINT WM_TRAYICON = WM_APP + 1;
     constexpr UINT ID_TRAY_EXIT = 1001;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
-    constexpr UINT_PTR TOOLTIP_TIMER_ID = 2;
-    constexpr UINT DATA_TIMER_INTERVAL = INTERVAL * 1000;
-    const vector<string> kRegionList = {
-        "ae", "ag", "ai", "am", "ar", "at", "au", "az", "bb", "be",
-        "bg", "bh", "bm", "bo", "br", "bs", "bw", "by", "bz", "ca",
-        "cf", "ch", "ci", "cl", "cm", "cn", "co", "cr", "cz", "de",
-        "dk", "dm", "do", "ec", "ee", "eg", "es", "fi", "fr", "gb",
-        "gd", "ge", "gn", "gq", "gr", "gt", "gw", "gy", "hk", "hn",
-        "hr", "hu", "id", "ie", "il", "in", "it", "jm", "jo", "jp",
-        "kg", "kn", "kr", "kw", "ky", "kz", "la", "lc", "li", "lt",
-        "lu", "lv", "ma", "md", "me", "mg", "mk", "ml", "mo", "ms",
-        "mt", "mu", "mx", "my", "mz", "ne", "ng", "ni", "nl", "no",
-        "nz", "om", "pa", "pe", "ph", "pl", "pr", "pt", "py", "qa",
-        "ro", "ru", "sa", "se", "sg", "si", "sk", "sn", "sr", "sv",
-        "tc", "th", "tj", "tm", "tn", "tr", "tt", "tw", "ua", "ug",
-        "us", "uy", "uz", "vc", "ve", "vg", "vn", "za"
-    };
-    const unordered_set<string> kValidRegions{kRegionList.begin(), kRegionList.end()};
-    constexpr char kRegionDbKey[] = "config:region";
-    constexpr auto kDefaultRegion = "ca";
+    const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
 namespace {
-    string makeLogName() {
-        const auto now = chrono::system_clock::now();
-        time_t t = chrono::system_clock::to_time_t(now);
-        tm tm{};
-        localtime_s(&tm, &t);
-        char buf[64];
-        snprintf(buf, sizeof(buf), "musicpp_%04d-%02d-%02d_%02d-%02d-%02d.log",
-                 tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec
+    string MakeLogName() {
+        const auto t = UnixSecondsNow();
+
+        const chrono::zoned_time local{chrono::current_zone(), chrono::sys_time(chrono::seconds{t})};
+
+        const auto lt = chrono::floor<chrono::seconds>(local.get_local_time());
+        const auto dp = chrono::floor<chrono::days>(lt);
+        const chrono::year_month_day ymd{dp};
+        const auto tod = chrono::hh_mm_ss{lt - dp};
+
+        return std::format("musicpp_{:04}-{:02}-{:02}_{:02}-{:02}-{:02}.log",
+                           static_cast<int>(ymd.year()),
+                           static_cast<unsigned>(ymd.month()),
+                           static_cast<unsigned>(ymd.day()),
+                           tod.hours().count(),
+                           tod.minutes().count(),
+                           tod.seconds().count()
         );
-        return string(buf);
     }
 
-    void pruneLogs(const filesystem::path &folder) {
-        int maxFiles = 10;
+    void PruneLogs(const filesystem::path &folder) {
         std::vector<filesystem::directory_entry> files;
         for (auto &entry: filesystem::directory_iterator(folder)) {
             if (entry.is_regular_file()) files.push_back(entry);
@@ -103,22 +91,22 @@ namespace {
             return a.last_write_time() > b.last_write_time();
         });
 
-        if (files.size() > maxFiles) {
-            for (size_t i = maxFiles; i < files.size(); i++) {
+        if (files.size() > kMaxFiles) {
+            for (size_t i = kMaxFiles; i < files.size(); i++) {
                 error_code ec;
                 filesystem::remove(files[i], ec);
                 if (ec) {
-                    wcout << L"Failed to remove old log file: " << convertToWString(files[i].path().string()) << endl;;
+                    wcout << L"Failed to remove old log file: " << ConvertToWString(files[i].path().string()) << endl;;
                 }
             }
         }
     }
 
-    bool isValidRegion(const std::string &region) {
+    bool IsValidRegion(const std::string &region) {
         return kValidRegions.contains(region);
     }
 
-    void printRegionList() {
+    void PrintRegionList() {
         wcout << L"\nAvailable Apple Music regions (country codes):" << endl;
         int count = 0;
         for (const auto &region: kRegionList) {
@@ -134,52 +122,50 @@ namespace {
         wcout << endl;
     }
 
-    void saveRegion(const AppContext &ctx, const std::string &region) {
+    void SaveRegion(const AppContext &ctx, const std::string &region) {
         if (!ctx.db) return;
-        const leveldb::Status status = ctx.db->Put(leveldb::WriteOptions(), kRegionDbKey, region);
-        if (!status.ok()) {
+        if (const leveldb::Status status = ctx.db->Put(leveldb::WriteOptions(), kRegionDbKey, region); !status.ok()) {
             if (ctx.logger) ctx.logger->warn("Failed to persist region {}: {}", region, status.ToString());
         } else {
             if (ctx.logger) ctx.logger->info("Set region to {}", region);
         }
     }
 
-    string loadRegion(const AppContext &ctx) {
+    string LoadRegion(const AppContext &ctx) {
         if (!ctx.db) return "";
         string region;
-        const leveldb::Status status = ctx.db->Get(leveldb::ReadOptions(), kRegionDbKey, &region);
-        if (!status.ok()) {
+        if (const leveldb::Status status = ctx.db->Get(leveldb::ReadOptions(), kRegionDbKey, &region); !status.ok()) {
             if (ctx.logger) ctx.logger->warn("Failed to read saved region: {}", status.ToString());
         }
         return region;
     }
 
-    string getRegion() {
+    string GetRegion() {
         wstring input;
         while (true) {
             wcout << L"Enter Apple Music region code (type 'list' to view options): ";
             wcin >> input;
 
-            string regionInput = toLowerCase(convertWString(input));
-            if (regionInput == "list") {
-                printRegionList();
+            string region_input = ToLowerCase(ConvertWString(input));
+            if (region_input == "list") {
+                PrintRegionList();
                 continue;
             }
 
-            if (isValidRegion(regionInput)) {
-                return regionInput;
+            if (IsValidRegion(region_input)) {
+                return region_input;
             }
 
             wcout << L"Region not recognized. Please choose a code from the list below." << endl;
-            printRegionList();
+            PrintRegionList();
         }
     }
 
-    string ensureRegion(const AppContext &ctx) {
-        string region = toLowerCase(loadRegion(ctx));
+    string EnsureRegion(const AppContext &ctx) {
+        string region = ToLowerCase(LoadRegion(ctx));
         if (region.empty()) {
             region = kDefaultRegion;
-            saveRegion(ctx, region);
+            SaveRegion(ctx, region);
         }
         return region;
     }
@@ -195,15 +181,15 @@ namespace {
 
         wcout << L"Configuration files: " << path << L'\n' << endl;
 
-        const filesystem::path basePath(path);
-        const filesystem::path dbPath = basePath / "musicpp" / "song_db";
-        const filesystem::path logPath = basePath / "musicpp" / "logs";
+        const filesystem::path base_path(path);
+        const filesystem::path db_path = base_path / "musicpp" / "song_db";
+        const filesystem::path log_path = base_path / "musicpp" / "logs";
         CoTaskMemFree(path);
 
         std::error_code ec1, ec2;
 
-        create_directories(dbPath, ec1);
-        create_directories(logPath, ec2);
+        create_directories(db_path, ec1);
+        create_directories(log_path, ec2);
 
         if (ec1) {
             wcout << L"Fatal: Could not create db folder: " << ec1.message().c_str() << endl;
@@ -214,15 +200,15 @@ namespace {
             wcout << L"Could not create log folder: " << ec2.message().c_str() << endl;
             wcout << L"The program will not have logs. Continuing..." << endl;
         } else {
-            pruneLogs(logPath);
-            const string name = makeLogName();
-            auto logger = spdlog::basic_logger_mt("MusicPP Logger", (logPath / name).string());
+            PruneLogs(log_path);
+            const string name = MakeLogName();
+            const auto logger = spdlog::basic_logger_mt("MusicPP Logger", (log_path / name).string());
 #ifdef LOG_LEVEL_DEBUG
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
 #elif defined(LOG_LEVEL_INFO)
             spdlog::set_level(spdlog::level::info);
-            spdlog::flush_every(std::chrono::seconds(2));
+            spdlog::flush_every(kLogFlushInterval);
 #else
             spdlog::set_level(spdlog::level::debug);
             logger->flush_on(spdlog::level::debug);
@@ -232,21 +218,21 @@ namespace {
         }
 
         if (ctx.logger) {
-            ctx.logger->info("Logger initialized at path: {}", logPath.string());
+            ctx.logger->info("Logger initialized at path: {}", log_path.string());
             ctx.logger->info("MusicPP starting up...");
         }
 
-        leveldb::DB *tempDB = nullptr;
+        leveldb::DB *temp_db = nullptr;
 
         leveldb::Options options;
 
         options.create_if_missing = true;
 
-        const leveldb::Status status = leveldb::DB::Open(options, dbPath.string(), &tempDB);
+        const leveldb::Status status = leveldb::DB::Open(options, db_path.string(), &temp_db);
 
         if (status.ok()) {
-            ctx.db.reset(tempDB);
-            if (ctx.logger) ctx.logger->info("Database initialized at path: {}", dbPath.string());
+            ctx.db.reset(temp_db);
+            if (ctx.logger) ctx.logger->info("Database initialized at path: {}", db_path.string());
             return true;
         }
 
@@ -302,19 +288,18 @@ namespace {
                 if (ctx.logger) ctx.logger->info("User initiated API key reset.");
                 wcout << L"Deleted all keys." << endl;
 
-                return true; // forceReset = true
+                return true;
             }
             if (input == L"2") {
                 wcout << L"Current Apple Music region: " << region.c_str() << endl;
-                printRegionList();
-                string newRegion = getRegion();
+                PrintRegionList();
 
-                if (newRegion != region) {
-                    region = newRegion;
-                    saveRegion(ctx, region);
-                    wcout << L"Apple Music region updated to " << region.c_str() << L"." << endl;
+                if (const string new_region = GetRegion(); new_region != region) {
+                    region = new_region;
+                    SaveRegion(ctx, region);
+                    wcout << L"Apple Music region updated to " << region.c_str() << endl;
                 } else {
-                    wcout << L"Region unchanged." << endl;
+                    wcout << L"Region unchanged" << endl;
                 }
             }
         } else {
@@ -322,29 +307,31 @@ namespace {
             wcout << L"\n\n[Auto-Start] No interaction detected. Loading keys..." << endl;
         }
 
-        return false; // forceReset = false
+        return false;
     }
 
-    void LoadCredentials(AppContext &ctx, bool forceReset, const string &region) {
+    void LoadCredentials(AppContext &ctx, const bool &force_reset, const string &region) {
         wcout << L"\nChecking API Keys..." << endl;
 
-        wstring s_cid = EnsureCredential(L"musicpp/spotify_client_id", L"Spotify Client ID",
-                                         L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
-                                         forceReset, ctx.logger.get());
+        const wstring s_cid = EnsureCredential(kSpotifyDbClientIdKey, L"Spotify Client ID",
+                                               L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
+                                               force_reset, ctx.logger.get());
 
-        wstring s_sec = EnsureCredential(L"musicpp/spotify_client_secret", L"Spotify Client Secret",
-                                         L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
-                                         forceReset, ctx.logger.get());
+        const wstring s_sec = EnsureCredential(kSpotifyDbClientSecretKey, L"Spotify Client Secret",
+                                               L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
+                                               force_reset, ctx.logger.get());
 
-        wstring i_cid = EnsureCredential(L"musicpp/imgur_client_id", L"Imgur Client ID",
-                                         L"https://api.imgur.com/oauth2/addclient", forceReset, ctx.logger.get());
+        const wstring i_cid = EnsureCredential(kImgurDbClientIdKey, L"Imgur Client ID",
+                                               L"https://api.imgur.com/oauth2/addclient", force_reset,
+                                               ctx.logger.get());
 
-        wstring lfm_key = EnsureCredential(L"musicpp/lastfm_api_key", L"LastFM API Key",
-                                           L"https://www.last.fm/api/account/create",
-                                           forceReset, ctx.logger.get());
+        const wstring lfm_key = EnsureCredential(kLastFmDbApikey, L"LastFM API Key",
+                                                 L"https://www.last.fm/api/account/create",
+                                                 force_reset, ctx.logger.get());
 
-        wstring lfm_secret = EnsureCredential(L"musicpp/lastfm_secret", L"LastFM Secret",
-                                              L"https://www.last.fm/api/account/create", forceReset, ctx.logger.get());
+        const wstring lfm_secret = EnsureCredential(kLastFmDbSecret, L"LastFM Secret",
+                                                    L"https://www.last.fm/api/account/create", force_reset,
+                                                    ctx.logger.get());
 
         wcout << "\nAll APIKeys found" << endl;
         if (ctx.logger) {
@@ -353,75 +340,91 @@ namespace {
 
         // Initialize API and Player objects
         wcout << L"Apple Music region: " << region.c_str() << endl;
-        ctx.scraper = std::make_unique<amscraper>(region, ctx.logger.get());
+        ctx.scraper = std::make_unique<Amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
-        ctx.lastfm = std::make_unique<lfm>(convertWString(lfm_key), convertWString(lfm_secret), ctx.logger.get());
+        ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.logger.get());
         if (ctx.logger) {
             ctx.logger->info("LastFM initialized");
         }
 
-        ctx.spotify = std::make_unique<SpotifyAPI>(convertWString(s_cid), convertWString(s_sec), ctx.logger.get());
+        ctx.spotify = std::make_unique<SpotifyApi>(ConvertWString(s_cid), ConvertWString(s_sec), ctx.logger.get());
         if (ctx.logger) {
             ctx.logger->info("SpotifyAPI initialized");
         }
 
-        ctx.imgur = std::make_unique<ImgurAPI>(convertWString(i_cid), ctx.logger.get());
+        ctx.imgur = std::make_unique<ImgurApi>(ConvertWString(i_cid), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("ImgurAPI initialized");
 
-        ctx.player = std::make_unique<mediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(),
+        ctx.player = std::make_unique<MediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(),
                                                    ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("mediaPlayer initialized");
 
-        ctx.discord = std::make_unique<discordrp>(ctx.player.get(), 1358389458956976128, ctx.logger.get());
+        ctx.discord = std::make_unique<Discordrp>(ctx.player.get(), kDiscordApikey, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("discordrp initialized");
     }
 
     void UpdateTrayTooltip(AppContext *ctx) {
         if (ctx->nid.cbSize == 0) return;
 
-        const wstring imageSource = ctx->player->getImageSource();
+        const wstring image_source = ctx->player->GetImageSource();
 
-        const bool playing = ctx->player->getState();
+        const bool playing = ctx->player->GetState();
 
-        wstringstream tipStream;
+        wstringstream tip_stream;
 
-        if (ctx->player->getArtist().empty()) {
-            tipStream << L"MusicPP\nNo track playing";
+        if (ctx->player->GetArtist().empty()) {
+            tip_stream << L"MusicPP\nNo track playing";
         } else {
-            tipStream << L"MusicPP\nPresence Active\n\n";
-            tipStream << L"Image Source: " << (!imageSource.empty() ? imageSource : L"unknown") << L"\n";
+            tip_stream << L"MusicPP\nPresence Active\n\n";
+            tip_stream << L"Image Source: " << (!image_source.empty() ? image_source : L"unknown") << L"\n";
 
             if (playing) {
-                if (const uint64_t duration = ctx->player->getDurationSeconds(); duration > 0) {
-                    const uint64_t elapsed = ctx->player->getElapsedSeconds();
+                if (const uint64_t duration = ctx->player->GetDurationSeconds(); duration > 0) {
+                    const uint64_t elapsed = ctx->player->GetElapsedSeconds();
 
-                    tipStream << L"" << FormatTimestamp(elapsed) << L" / " << FormatTimestamp(duration) << L"\n";
+                    tip_stream << L"" << FormatTimestamp(elapsed) << L" / " << FormatTimestamp(duration) << L"\n";
                 }
             } else {
-                tipStream << L"Paused" << L"\n";
+                tip_stream << L"Paused" << L"\n";
             }
         }
 
-        wstring tip = tipStream.str();
+        const wstring tip = tip_stream.str();
 
-        if (tip == ctx->lastTip) {
+        if (tip == ctx->last_tip) {
             return;
         }
 
-        ctx->lastTip = tip;
+        ctx->last_tip = tip;
 
-        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: {}", convertWString(tip));
+        if (ctx->logger) ctx->logger->debug("Updating tray tooltip to: {}", ConvertWString(tip));
 
         lstrcpynW(ctx->nid.szTip, tip.c_str(), ARRAYSIZE(ctx->nid.szTip));
 
-        ctx->nid.uFlags = NIF_TIP;
+        ctx->nid.uFlags |= NIF_TIP | NIF_ICON | NIF_MESSAGE;
 
         Shell_NotifyIcon(NIM_MODIFY, &ctx->nid);
     }
 
-    LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    LRESULT CALLBACK WndProc(const HWND hWnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
         auto *ctx = reinterpret_cast<AppContext *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
+
+        if (msg == g_wm_taskbar_restart) {
+            if (ctx && ctx->nid.cbSize != 0) {
+                // Explorer restarted
+                ctx->nid.uFlags |= NIF_MESSAGE | NIF_ICON | NIF_TIP;
+                if (!ctx->nid.hIcon) {
+                    ctx->nid.hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APPICON));
+                    if (!ctx->nid.hIcon) ctx->nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION); // Fallback
+                }
+                Shell_NotifyIcon(NIM_ADD, &ctx->nid);
+                if (ctx->logger) ctx->logger->info("Shell restarted, tray icon recreated");
+            }
+
+            UpdateTrayTooltip(ctx);
+            return 0;
+        }
 
         switch (msg) {
             case WM_CREATE: {
@@ -459,11 +462,11 @@ namespace {
 
                 // Start Timers
 
-                SetTimer(hWnd, DATA_TIMER_ID, DATA_TIMER_INTERVAL, nullptr);
+                SetTimer(hWnd, DATA_TIMER_ID, kLoopRefreshInterval, nullptr);
 
                 if (ctx->logger)
                     ctx->logger->debug("Timer started: Data ({}) ms",
-                                       DATA_TIMER_INTERVAL);
+                                       kLoopRefreshInterval);
                 return 0;
             }
 
@@ -477,15 +480,15 @@ namespace {
                     SetForegroundWindow(hWnd); // Required for menu behavior
 
 
-                    if (HMENU hMenu = CreatePopupMenu()) {
+                    if (const HMENU hMenu = CreatePopupMenu()) {
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, TEXT("MusicPP"));
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getTitle().c_str());
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getArtist().c_str());
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->getAlbum().c_str());
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetTitle().c_str());
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetArtist().c_str());
+                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->player->GetAlbum().c_str());
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
-                        UINT cmd = TrackPopupMenu(
+                        const UINT cmd = TrackPopupMenu(
                             hMenu,
                             TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RETURNCMD,
                             pt.x,
@@ -524,7 +527,7 @@ namespace {
                     return 0;
                 }
 
-                ctx->player->getInfo();
+                ctx->player->UpdateInfo();
                 ctx->discord->update();
                 UpdateTrayTooltip(ctx);
                 if (ctx->logger) ctx->logger->debug("Data timer update cycle completed.");
@@ -536,7 +539,6 @@ namespace {
 
                 if (ctx) {
                     KillTimer(hWnd, DATA_TIMER_ID);
-                    KillTimer(hWnd, TOOLTIP_TIMER_ID);
 
                     Shell_NotifyIcon(NIM_DELETE, &ctx->nid);
 
@@ -564,21 +566,23 @@ namespace {
     }
 } // Helpers
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(const HINSTANCE hInstance, const HINSTANCE hPrevInstance, const LPSTR lpCmdLine,
+                   const int nCmdShow) {
     SetupConsole();
 
     AppContext ctx;
 
     if (!InitializeDatabase(ctx)) {
+        // Let user see error before closing
         std::wcout << L"Press Enter to continue..." << std::endl;
-        std::wcin.get(); // Let user see errorMode();
+        std::wcin.get();
         return 1;
     }
 
-    std::string region = ensureRegion(ctx);
-    bool forceReset = RunConfigurationMode(ctx, region);
+    std::string region = EnsureRegion(ctx);
+    const bool force_reset = RunConfigurationMode(ctx, region);
 
-    LoadCredentials(ctx, forceReset, region);
+    LoadCredentials(ctx, force_reset, region);
     if (ctx.logger) ctx.logger->info("Load credentials finished");
 
     wcout << "\nThis console window will automatically close in 3 seconds" << endl;
@@ -591,6 +595,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     CleanupConsole();
     if (ctx.logger) ctx.logger->info("Console cleanup complete, moving to message loop");
+
+    g_wm_taskbar_restart = RegisterWindowMessage(TEXT("TaskbarCreated"));
+
+    if (g_wm_taskbar_restart == 0) {
+        if (ctx.logger) ctx.logger->error("Failed to register TaskbarCreated message");
+    }
 
     WNDCLASSW wc{};
 

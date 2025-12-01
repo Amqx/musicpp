@@ -6,23 +6,41 @@
 #define MUSICPP_STRINGUTILS_H
 
 #include <string>
+#include <libxml/tree.h>
 
-std::wstring convertToWString(const std::string &str);
+bool FuzzyMatch(const std::string &a, const std::string &b);
 
-std::string convertWString(const std::wstring &wstr);
+std::wstring ConvertToWString(const std::string &str);
 
-int levenshteinDistance(const std::string &s1, const std::string &s2);
+std::string ConvertWString(const std::wstring &wstr);
 
-double calculateSimilarity(const std::string &str1, const std::string &str2);
+int LevenshteinDistance(const std::string &s1, const std::string &s2);
 
-std::string toLowerCase(const std::string &str);
+double CalculateSimilarity(const std::string &str1, const std::string &str2);
 
-std::string discord_bounds(const std::wstring &wstr, const std::string &fallback);
+std::string ToLowerCase(const std::string &str);
 
-std::string sanitizeKeys(std::string input);
+std::string DiscordBounds(const std::wstring &wstr, const std::string &fallback);
 
-std::string md5(const std::string &input);
+std::string SanitizeKeys(std::string input);
 
-std::string cleanAlbumName(const std::string &input);
+std::string Md5(const std::string &input);
+
+std::string CleanAlbumName(const std::string &input);
+
+std::string GetAttribute(const xmlNodePtr &node, const char *attribute);
+
+std::string GetText(const xmlNodePtr &node);
+
+std::string Normalize(const std::string &text);
+
+xmlNodePtr FindDescendantWithAttr(const xmlNodePtr &node, const char *tag_name, const char *attr_name,
+                                  const char *attr_value);
+
+xmlNodePtr FindDivWithClass(const xmlNodePtr &node, const std::string &class_value);
+
+bool TrackMatches(const xmlNodePtr &li_node, const std::string &target_title, const std::string &target_artist);
+
+xmlNodePtr FindMatchingListItem(const xmlNodePtr &node, const std::string &title, const std::string &artist);
 
 #endif //MUSICPP_STRINGUTILS_H

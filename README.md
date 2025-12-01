@@ -1,6 +1,6 @@
 # MusicPP
 
-Discord Rich Presence for Apple Music written in C++ using Windows Runtime APIs.
+Discord Rich Presence for the Windows Apple Music desktop app written in C++/WinRT.
 
 ![full](images/full.png)
 
@@ -8,158 +8,127 @@ Discord Rich Presence for Apple Music written in C++ using Windows Runtime APIs.
 
 ## Features
 
-- Displays track title, artist, and album
-- Shows album art sourced from Apple Music (99% find rate), with Spotify and Imgur as fallbacks
-- Caching with [LevelDB](https://github.com/google/leveldb)
-- Progress bar/ timestamps
-- Last.fm now playing and scrobbling support
-- Tray icon for current status
-- Support for "Listening to {title}" status (similar to old Spotify presence behaviour)
-- Buttons to open the track in Apple Music and LastFM/ Spotify (when found)
-- Low resource usage (~5-10MB RAM, ~0.1% CPU, ~11MB disk space (including dependencies))
-- Written entirely in Windows native C++
+- Rich presence with track title, artist, album, progress bar, and pause state
+- Album art with Apple Music first, then Spotify, then Imgur as fallbacks (cached in LevelDB)
+- Optional Last.fm now playing + scrobbling
+- Tray icon showing current status and quick exit
+- Presence buttons for Apple Music plus Last.fm or Spotify links (when available)
+- Low resource usage (~5–10MB RAM, ~0.1% CPU, ~11MB disk with deps)
 
-Warning: Because this project was built for my own usage only, I made this without configurability in mind.
-If you want to modify anything, you will have to do so manually. See below for more details.
+Warning: this was built for personal use; there is no runtime UI for changing settings. Anything beyond the built-in
+configuration flow requires editing the source.
 
 ## Requirements
 
-- Microsot VC Redist ([lastest x64](https://aka.ms/vc14/vc_redist.x64.exe))
-- Spotify API Credentials ([optional](https://developer.spotify.com/dashboard))
-- Imgur API Credentials ([optional](https://api.imgur.com/oauth2/addclient))
-- Last.fm API credentials ([options](https://www.last.fm/api/account/create))
+- Windows 10/11 with the Apple Music app installed
+- Microsoft Visual C++ Redistributable x64 ([latest](https://aka.ms/vc14/vc_redist.x64.exe))
+    - You may already have this: Look in Settings -> Apps -> Installed apps and search for "Microsoft Visual C++ v14
+      Redistributable"
+- Optional API credentials:
+    - Spotify Client ID + Secret ([Available Here](https://developer.spotify.com/dashboard))
+    - Imgur Client ID ([Available Here](https://api.imgur.com/oauth2/addclient))
+    - Last.fm API Key + Secret ([Available Here](https://www.last.fm/api/account/create))
 
-## Configuration
+## First Run & Configuration
 
-To modify any part of this you will have to recompile it from source. Please read the following section on building from
-source
-for help with that.
+1. Download the latest release [here](https://github.com/Amqx/musicpp/releases/latest) or build from source (
+   instructions below).
+2. On first launch (or after reset) you will be prompted in the console for the API keys above.
+3. After 3 seconds the console closes and MusicPP keeps running from the system tray. Right-click the tray icon to exit.
 
-### Discord Rich Presence
+Saved data:
 
-You can change the style of the rich presence that is shown on Discord. Do note that buttons cannot be viewed from the
-rich presence user's perspective, and require an alt account to view.
-
-The code that updates the rich presence can be found [here](src/discordrp.cpp), in the`void discordrp::update()` method.
-The available metadata has been listed below, and has already been extracted for you. You can use Discord's
-guide [here](https://discord.com/developers/docs/social-sdk/classdiscordpp_1_1Activity.html)
-for more details.
-
-#### Available metadata
-
-For the source links, please check if they are not empty before using them (.empty). Furthermore, please use the current
-playback
-state to determine which timestamps should be used (start_ts and end_ts when playing is true, pause_ts when playing is
-false).
-
-The following are listed in the format: {description} ({type})({var name})
-
-- Title (string)(title)
-- Artist (string)(artist)
-- Album (string)(album)
-- Image link (string)(imglink)
-- Apple Music link (string)(amlink)
-- LastFM link (string)(LFMlink)
-- Spotify link (string)(splink)
-- Current playback state (boolean)(playing)
-- Playback start time (int)(start_ts)
-- Projected playback end time (int)(end_ts)
-- When the current track was paused (int)(pause_ts)
-
-### Last.FM Scrobbling behaviour
-
-You can manually change the behaviour of when a scrobble should be considered valid. This can be
-found [here](include/mediaPlayer.h).
-Modify the constexpr at the top to control the behaviour.
-
-#### Available configuration
-
-Before changing anything, please make sure you read the last.fm
-API [documentation](https://www.last.fm/api/show/track.scrobble) and [guidelines](https://www.last.fm/api/scrobbling).
-Some settings have a minimum
-value, and will break the rules provisioned by last.fm, causing you to have invalid scrobbles.
-
-The following are listed in the format: {description} ({type})({var name})({min})
-
-- Minimum length a track should be in seconds (int)(kLfmMinTime)(30)
-- Percentage of duration before being sent for scrobble (double)(kLfmPercentage)(0.5)
-- Time before a track should be automatically scrobbled in seconds (int)(kLfmElapsedTime)(240)
+- Cache/DB: `%LOCALAPPDATA%\\musicpp\\song_db`
+- Logs: `%LOCALAPPDATA%\\musicpp\\logs`
 
 ## Building from Source
 
+When building from source, if you intend to move the final .exe somewhere, make sure to bring the .dlls with it.
+
 ### CLion
 
-The easiest way to do this is with CLion. Make sure you have the VCPKG extension installed.
+The simplest path is CLion with VCPKG integration.
 
-1. Install [CLion](https://www.jetbrains.com/clion/). Make sure you have Microsoft Visual Studio installed.
-    ```
-    winget install --id=Microsoft.VisualStudio.2022.Community
+1. Install [CLion](https://www.jetbrains.com/clion/) and Microsoft Visual Studio Build Tools (Community works):
+   ```powershell
+   winget install --id=Microsoft.VisualStudio.2022.Community
    ```
-2. Clone the project with git or the gui
-    ```
-    git clone https://github.com/Amqx/musicpp
+2. Clone the project:
+   ```powershell
+   git clone https://github.com/Amqx/musicpp
    ```
-3. Install the VCPKG extension and install the dependencies. You can use the GUI or call it manually. Make sure it is
-   enabled for the project (VCPKG -> edit -> Add Vcpkg integration to existing CMake Profiles)
-    - CURL
-    - LevelDB
-    - CPPWinRT
-    - nlohmann/json
-    - spdlog
-    - LibXml2
-    ```
-    ~/.vcpkg-clion/vcpkg/vcpkg.exe install curl leveldb cppwinrt nlohmann-json spdlog libxml2
-    ```
-4. Install Discord Social SDK
+3. Install the VCPKG plugin and enable integration for the project (VCPKG -> Edit -> Add Vcpkg integration to existing
+   CMake Profiles).
+4. Install dependencies:
+   ```powershell
+   ~/.vcpkg-clion/vcpkg/vcpkg.exe install curl leveldb cppwinrt nlohmann-json spdlog libxml2
+   ```
+5. Install the Discord Social SDK into `discordsdk/` (see next section).
+6. Build and run from CLion (Shift + F10).
 
-   See below for more details.
-5. Build (Shift + F10) and run.
+### Manual (CMake + Ninja)
 
-### Manual:
-
-1. Make sure you have CMake, Ninja and Microsoft Visual Studio installed.
-    ```
-   winget install --id=Kitware.CMake 
+1. Install CMake, Ninja, and Visual Studio Build Tools:
+   ```powershell
+   winget install --id=Kitware.CMake
    winget install --id=Ninja-build.Ninja
    winget install --id=Microsoft.VisualStudio.2022.Community
    ```
-2. Clone the repository: 
-    ```
-    git clone https://github.com/Amqx/musicpp
+2. Clone the repository:
+   ```powershell
+   git clone https://github.com/Amqx/musicpp
    ```
-3. Get dependencies (VCPKG is probably easiest):
-    ```
-    vcpkg install curl leveldb cppwinrt nlohmann-json spdlog libxml2
-    ```
-   - CURL
-   - LevelDB
-   - CPPWinRT
-   - nlohmann/json
-   - spdlog
-   - LibXml2
-   
-4. Install Discord Social SDK
-
-   See below for more details.
-   
-5. Configure and build the project with CMake
-    ```
-    mkdir build
-    cd build
-    cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release  -DCMAKE_MAKE_PROGRAM={path to ninja} -DCMAKE_TOOLCHAIN_FILE={path to vcpkg}
-    cmake --build . --target musicpp
-    ```
+3. Install dependencies (VCPKG is easiest):
+   ```powershell
+   vcpkg install curl leveldb cppwinrt nlohmann-json spdlog libxml2
+   ```
+4. Install the Discord Social SDK into `discordsdk/` (see next section).
+5. Configure and build:
+   ```powershell
+   mkdir build
+   cd build
+   cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE={path-to-vcpkg}/scripts/buildsystems/vcpkg.cmake
+   cmake --build . --config Release --target musicpp
+   ```
 
 ## Installing the Discord Social SDK
 
-You can download it from the [Discord Developer Portal](https://discord.com/developers/docs/game-sdk/sdk-starter-guide).
-Do note that you have to log in or signup
-to download the SDK. When prompted to create an application, do note that if you intend to
-use your own application id, the name is what shows on Discord ("Listening to {name}" in the screenshot with the
-buttons). If
-you are going to use the default key, you can input whatever for the name. The section after (tell us a bit about your
-game) you can write anything you want. Once
-you have access to the downloads, make sure you get the one without Unity or Unreal in the name. The downloaded SDK
-should be something like *DiscordSocialSdk-{version}.zip*. Extract it, then copy the folder discord_social_sdk into the
-MusicPP
-project root. Rename it to discordsdk so CMake can find it.
+Download the SDK from the [Discord Developer Portal](https://discord.com/developers/docs/game-sdk/sdk-starter-guide) (
+log in required). Choose the package without Unity/Unreal. Extract `discord_social_sdk-{version}.zip`, copy
+`discord_social_sdk` into the project root, rename it to `discordsdk`, and keep the `bin`, `lib`, and `include` folders
+intact so CMake can find them.
+
+## Customization
+
+### Discord Rich Presence
+
+You can change the presence content in `src/discordrp.cpp` inside `void Discordrp::update()`. Available metadata has
+already been extracted for you:
+
+- Title (`title`)
+- Artist (`artist`)
+- Album (`album`)
+- Image link (`imglink`)
+- Apple Music link (`amlink`)
+- Last.fm link (`LFMlink`)
+- Spotify link (`splink`)
+- Current playback state (`playing`)
+- Playback start (`start_ts`)
+- Projected end (`end_ts`)
+- Pause timestamp (`pause_ts`)
+
+Check links for emptiness before using them, and pick timestamps based on the current playback state (start/end when
+playing, pause when not). Discord buttons are only visible to other users, not on your own profile.
+
+### Last.fm Scrobbling Behaviour
+
+Tunables live in `include/constants.h` under the Last.fm section. Read
+the [Last.fm scrobble docs](https://www.last.fm/api/show/track.scrobble)
+and [guidelines](https://www.last.fm/api/scrobbling) before changing values. Available settings (format: description (
+type)(var)(min)):
+
+- Maximum scrobble attempts (int)(kMaxScrobbleAttempts)
+- Maximum now playing attempts (int)(kMaxSetNowPlayingAttempts)
+- Minimum track length in seconds (int)(kLfmMinTime)(30)
+- Percentage of duration before scrobble (double)(kLfmPercentage)(0.5)
+- Time before auto-scrobble in seconds (int)(kLfmElapsedTime)(240)

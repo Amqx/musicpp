@@ -5,50 +5,48 @@
 #ifndef MUSICPP_LFM_H
 #define MUSICPP_LFM_H
 
-#include <chrono>
 #include <string>
-
 #include "utils.h"
 
 namespace spdlog {
     class logger;
 }
 
-class lfm {
+class Lfm {
 public:
-    lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger *logger = nullptr);
+    Lfm(const std::string &apikey, const std::string &apisecret, spdlog::logger *logger = nullptr);
 
-    ~lfm();
+    ~Lfm();
 
-    lfm(const lfm &) = delete;
+    Lfm(const Lfm &) = delete;
 
-    lfm &operator=(const lfm &) = delete;
+    Lfm &operator=(const Lfm &) = delete;
 
     // Does not require auth
-    std::string searchTracks(const std::string &title, const std::string &artist) const;
+    std::string SearchTracks(const std::string &title, const std::string &artist) const;
 
-    bool updateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
-                          const time_t &duration) const;
+    bool UpdateNowPlaying(const std::string &title, const std::string &artist, const std::string &album,
+                          const uint64_t &duration) const;
 
     bool scrobble(const std::string &title, const std::string &artist, const std::string &album,
-                  const time_t &start) const;
+                  const uint64_t &start) const;
 
 private:
-    spdlog::logger *logger;
+    spdlog::logger *logger_;
 
-    std::string sessionKey;
-    std::string apikey;
-    std::string apisecret;
+    std::string session_key_;
+    std::string apikey_;
+    std::string apisecret_;
 
-    std::time_t tokenValidity;
+    uint64_t token_validity_;
 
-    bool enabled;
+    bool enabled_;
 
-    std::string authRequestToken();
+    std::string AuthRequestToken();
 
-    bool authTestSession(const std::string &testKey) const;
+    bool AuthTestSession(const std::string &test_key) const;
 
-    bool authGetSession(const std::string &token);
+    bool AuthGetSession(const std::string &token);
 };
 
 

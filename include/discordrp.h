@@ -5,35 +5,38 @@
 #ifndef MUSICPP_DISCORDRP_H
 #define MUSICPP_DISCORDRP_H
 
-#include <discordpp.h>
-#include <mediaPlayer.h>
 #include <atomic>
 #include <thread>
-#include <spdlog/spdlog.h>
+#include "discordpp.h"
+#include "mediaPlayer.h"
+
+namespace spdlog {
+    class logger;
+}
 
 using namespace std;
 
-class discordrp {
+class Discordrp {
 public:
-    discordrp(mediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger = nullptr);
+    Discordrp(MediaPlayer *player, const uint64_t &apikey, spdlog::logger *logger = nullptr);
 
-    ~discordrp();
+    ~Discordrp();
 
-    discordrp(const discordrp &) = delete;
+    Discordrp(const Discordrp &) = delete;
 
-    discordrp &operator=(const discordrp &) = delete;
+    Discordrp &operator=(const Discordrp &) = delete;
 
     void update() const;
 
 private:
-    spdlog::logger *logger;
-    atomic<bool> running{false};
-    thread refreshThread;
-    uint64_t clientID;
-    mediaPlayer *appleMusic;
-    shared_ptr<discordpp::Client> client = std::make_shared<discordpp::Client>();
+    spdlog::logger *logger_;
+    atomic<bool> running_{false};
+    thread refresh_thread_;
+    uint64_t client_id_;
+    MediaPlayer *apple_music_;
+    shared_ptr<discordpp::Client> client_ = std::make_shared<discordpp::Client>();
 
-    void refreshLoop() const;
+    void RefreshLoop() const;
 };
 
 

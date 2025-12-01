@@ -5,6 +5,13 @@ project(musicpp)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (USE_STATIC_LINKING)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+    set(BUILD_SHARED_LIBS OFF)
+else ()
+    set(BUILD_SHARED_LIBS ON)
+endif ()
+
 find_package(CURL CONFIG REQUIRED)
 find_package(cppwinrt CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -33,7 +40,6 @@ add_executable(musicpp
         src/imgur.cpp
         src/discordrp.cpp
         src/credhelper.cpp
-        src/discordpp_impl.cpp
         ${RESOURCE_FILE}
         src/timeutils.cpp
         src/consoleutils.cpp

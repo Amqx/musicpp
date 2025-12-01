@@ -7,28 +7,31 @@
 
 #include <string>
 #include <winrt/Windows.Storage.Streams.h>
-#include <spdlog/spdlog.h>
+
+namespace spdlog {
+    class logger;
+}
 
 using namespace std;
 using namespace winrt;
 using namespace Windows::Storage::Streams;
 
-class ImgurAPI {
+class ImgurApi {
 public:
-    ImgurAPI(const string &apikey, spdlog::logger *logger = nullptr);
+    explicit ImgurApi(const string &apikey, spdlog::logger *logger = nullptr);
 
-    ~ImgurAPI();
+    ~ImgurApi();
 
-    ImgurAPI(const ImgurAPI &) = delete;
+    ImgurApi(const ImgurApi &) = delete;
 
-    ImgurAPI &operator=(const ImgurAPI &) = delete;
+    ImgurApi &operator=(const ImgurApi &) = delete;
 
-    string uploadImage(const IRandomAccessStreamReference &streamRef) const;
+    [[nodiscard]] string UploadImage(const IRandomAccessStreamReference &stream_ref) const;
 
 private:
-    string clientID;
+    string client_id_;
 
-    spdlog::logger *logger;
+    spdlog::logger *logger_;
 };
 
 

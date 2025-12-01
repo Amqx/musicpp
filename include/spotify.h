@@ -9,45 +9,43 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <utils.h>
+#include "utils.h"
 
 using namespace std;
 
 namespace spdlog {
     class logger;
-}
+};
 
-class SpotifyAPI {
+class SpotifyApi {
 public:
-    SpotifyAPI(const string &apikey, const string &apisecret, spdlog::logger *logger = nullptr);
+    SpotifyApi(const string &apikey, const string &apisecret, spdlog::logger *logger = nullptr);
 
-    ~SpotifyAPI();
+    ~SpotifyApi();
 
     // Delete copy constructor and copy assignment operator
-    SpotifyAPI(const SpotifyAPI &) = delete;
+    SpotifyApi(const SpotifyApi &) = delete;
 
-    SpotifyAPI &operator=(const SpotifyAPI &) = delete;
+    SpotifyApi &operator=(const SpotifyApi &) = delete;
 
-    string getAccessToken();
+    string GetAccessToken();
 
-    searchResult searchTracks(const string &title = "",
-                              const string &artist = "",
-                              const string &album = "");
+    SearchResult SearchTracks(const string &title = "", const string &artist = "", const string &album = "");
 
 private:
-    spdlog::logger *logger;
-    string clientId;
-    string clientSecret;
-    string accessToken;
-    atomic<bool> running{false};
-    thread refreshThread;
-    mutex tokenMutex;
-    uint64_t lastRefreshTime;
-    std::condition_variable cv;
-    std::mutex cvMutex;
+    spdlog::logger *logger_;
+    string client_id_;
+    string client_secret_;
+    string access_token_;
+    atomic<bool> running_{false};
+    thread refresh_thread_;
+    mutex token_mutex_;
+    uint64_t last_refresh_time_;
+    std::condition_variable cv_;
+    std::mutex cv_mutex_;
 
-    bool requestToken();
+    bool RequestToken();
 
-    void refreshLoop();
+    void RefreshLoop();
 };
 #endif //MUSICPP_SPOTIFY_H

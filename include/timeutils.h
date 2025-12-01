@@ -7,11 +7,8 @@
 
 #include <string>
 
+std::wstring FormatTimestamp(const uint64_t &seconds);
 
-constexpr uint64_t INVALID_TIME = std::numeric_limits<uint64_t>::max();
-
-std::wstring FormatTimestamp(uint64_t seconds);
-
-uint64_t unix_seconds_now();
+uint64_t UnixSecondsNow();
 
 #endif //MUSICPP_TIMEUTILS_H

@@ -2,13 +2,14 @@
 // Created by Jonathan on 17-Nov-25.
 //
 
-#include "consoleutils.h"
 #include <windows.h>
 #include <shellapi.h>
 #include <filesystem>
 #include <io.h>
 #include <fcntl.h>
 #include <iostream>
+#include "consoleutils.h"
+#include "constants.h"
 
 using namespace std;
 using namespace std::filesystem;
@@ -32,12 +33,12 @@ void SetupConsole() {
 
     _setmode(_fileno(stderr), _O_U8TEXT);
 
-    wcout << L"MusicPP V1.0" << endl;
+    wcout << L"MusicPP V" << kVersion << endl;
 }
 
 
 void CleanupConsole() {
-    if (HWND consoleWnd = GetConsoleWindow(); consoleWnd != nullptr) {
+    if (const HWND consoleWnd = GetConsoleWindow(); consoleWnd != nullptr) {
         ShowWindow(consoleWnd, SW_HIDE);
     }
 

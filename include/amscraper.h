@@ -6,23 +6,23 @@
 #define MUSICPP_AMSCRAPER_H
 
 #include <string>
-#include <utils.h>
+#include "utils.h"
 
 namespace spdlog {
     class logger;
 }
 
-class amscraper {
+class Amscraper {
 public:
-    explicit amscraper(const std::string &region, spdlog::logger *logger = nullptr);
+    explicit Amscraper(const std::string &region, spdlog::logger *logger = nullptr);
 
-    ~amscraper();
+    ~Amscraper();
 
-    searchResult searchTracks(const std::string &title, const std::string &artist, const std::string &album) const;
+    SearchResult SearchTracks(const std::string &title, const std::string &artist, const std::string &album) const;
 
 private:
-    std::string region;
-    spdlog::logger *logger;
+    std::string region_;
+    spdlog::logger *logger_;
 };
 
 
