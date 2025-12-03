@@ -90,5 +90,8 @@ constexpr uint64_t kWindowsTsConversion = 10'000'000;
 // Windows gives us the current timestamp as nanoseconds, this converts to seconds
 constexpr int kDbExpireTime = 7 * 24 * 60 * 60; // images/ links automatically expire in a week
 constexpr uint64_t kInvalidTime = std::numeric_limits<uint64_t>::max();
+constexpr int kSnapshotTypeDiscord = 1;
+constexpr int kSnapshotTypeTray = 2;
+constexpr int kSnapshotTypeTime = 3;
 
 #endif

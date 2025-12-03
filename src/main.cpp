@@ -63,6 +63,8 @@ namespace {
     constexpr UINT ID_COPY_ALBUM = 1004;
     constexpr UINT ID_TRAY_DISCORD_TOGGLE = 1005;
     constexpr UINT ID_TRAY_LASTFM_TOGGLE = 1006;
+    constexpr UINT ID_TRAY_FORCE_REFRESH = 1007;
+    constexpr UINT ID_COPY_IMAGE = 1008;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
     const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
@@ -373,21 +375,23 @@ namespace {
     void UpdateTrayTooltip(AppContext *ctx) {
         if (ctx->nid.cbSize == 0) return;
 
-        const wstring image_source = ctx->player->GetImageSource();
+        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTime);
 
-        const bool playing = ctx->player->GetState();
+        const wstring image_source = metadata.image_source;
+
+        const bool playing = metadata.state;
 
         wstringstream tip_stream;
 
-        if (ctx->player->GetArtist().empty()) {
+        if (metadata.album.empty()) {
             tip_stream << L"MusicPP\nNo track playing";
         } else {
             tip_stream << L"MusicPP\nPresence Active\n\n";
             tip_stream << L"Image Source: " << (!image_source.empty() ? image_source : L"unknown") << L"\n";
 
             if (playing) {
-                if (const uint64_t duration = ctx->player->GetDurationSeconds(); duration > 0) {
-                    const uint64_t elapsed = ctx->player->GetElapsedSeconds();
+                if (const uint64_t duration = metadata.duration; duration > 0) {
+                    const uint64_t elapsed = metadata.elapsed;
 
                     tip_stream << L"" << FormatTimestamp(elapsed) << L" / " << FormatTimestamp(duration) << L"\n";
                 }
@@ -514,14 +518,19 @@ namespace {
                         const wstring v = L"MusicPP V" + kVersion;
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-                        const wstring title = ctx->player->GetTitle();
-                        const wstring artist = ctx->player->GetArtist();
-                        const wstring album = ctx->player->GetAlbum();
-                        if (ctx->player->HasActiveSession() && !title.empty() && !artist.empty() && !album.empty()) {
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        const wstring title = metadata.title;
+                        const wstring artist = metadata.artist;
+                        const wstring album = metadata.album;
+                        if (metadata.has_session && !title.empty() && !artist.empty() && !album.empty()) {
                             AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Now Playing");
                             AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, EscapeAmpersands(Truncate(title)).c_str());
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, EscapeAmpersands(Truncate(artist)).c_str());
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, EscapeAmpersands(Truncate(album)).c_str());
+                            AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+                            AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Image");
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_IMAGE, metadata.image_source.c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_TRAY_FORCE_REFRESH, L"Force Refresh");
                             AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         }
 
@@ -581,17 +590,32 @@ namespace {
                     }
 
                     case ID_COPY_TITLE: {
-                        CopyToClipboard(ctx, ctx->player->GetTitle());
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        CopyToClipboard(ctx, metadata.title);
                         return 0;
                     }
 
                     case ID_COPY_ARTIST: {
-                        CopyToClipboard(ctx, ctx->player->GetArtist());
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        CopyToClipboard(ctx, metadata.artist);
                         return 0;
                     }
 
                     case ID_COPY_ALBUM: {
-                        CopyToClipboard(ctx, ctx->player->GetAlbum());
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        CopyToClipboard(ctx, metadata.album);
+                        return 0;
+                    }
+
+                    case ID_COPY_IMAGE: {
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        CopyToClipboard(ctx, metadata.image);
+                        return 0;
+                    }
+
+                    case ID_TRAY_FORCE_REFRESH: {
+                        if (ctx->logger) ctx->logger->info("User forced an image refresh");
+                        ctx->player->ImageRefresh();
                         return 0;
                     }
 

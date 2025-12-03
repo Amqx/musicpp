@@ -8,9 +8,12 @@
 #include <string>
 #include <winrt/windows.media.control.h>
 #include <leveldb/db.h>
+#include <shared_mutex>
+
 #include "spotify.h"
 #include "imgur.h"
 #include "amscraper.h"
+#include "constants.h"
 #include "lfm.h"
 
 namespace spdlog {
@@ -40,6 +43,24 @@ struct ArtworkLog {
     std::string final_source;
 };
 
+struct Snapshot {
+    wstring title = L"";
+    wstring artist = L"";
+    wstring album = L"";
+    wstring image = L"";
+    wstring image_source = L"";
+    wstring amlink = L"";
+    wstring lfmlink = L"";
+    wstring splink = L"";
+    uint64_t start_ts = kInvalidTime;
+    uint64_t end_ts = kInvalidTime;
+    bool state = false;
+    bool has_session = false;
+    uint64_t pause_timer = kInvalidTime;
+    uint64_t duration = kInvalidTime;
+    uint64_t elapsed = kInvalidTime;
+};
+
 class MediaPlayer {
 public:
     MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
@@ -47,45 +68,11 @@ public:
 
     ~MediaPlayer();
 
-    [[nodiscard]] wstring GetTitle();
-
-    [[nodiscard]] wstring GetArtist();
-
-    [[nodiscard]] wstring GetAlbum();
-
-    [[nodiscard]] wstring GetImage();
-
-    [[nodiscard]] wstring GetImageSource();
-
-    [[nodiscard]] wstring GetAmLink();
-
-    [[nodiscard]] wstring GetLastFmLink();
-
-    [[nodiscard]] wstring GetSpotifyLink();
-
-    [[nodiscard]] uint64_t GetStartTs() const;
-
-    [[nodiscard]] uint64_t GetEndTs() const;
-
-    [[nodiscard]] bool GetState() const;
-
-    [[nodiscard]] bool HasActiveSession() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetPauseTimer() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetDurationSeconds() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetElapsedSeconds() const;
+    [[nodiscard]] Snapshot GetSnapshot(int type);
 
     void UpdateInfo();
 
-    void pause();
-
-    void play();
-
-    void reset();
-
-    void PrintInfo() const;
+    void ImageRefresh();
 
 private:
     leveldb::DB *db_;
@@ -93,6 +80,7 @@ private:
     wstring artist_;
     wstring album_;
     wstring image_;
+    IRandomAccessStreamReference image_raw_;
     wstring spotify_link_;
     wstring amlink_;
     wstring lastfmlink_;
@@ -113,6 +101,19 @@ private:
     int nowplayingattempts_ = 0;
     Windows::Media::Control::GlobalSystemMediaTransportControlsSession session_ = nullptr;
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
+
+    shared_mutex state_mutex_;
+    atomic_bool refresh_in_progress_ = false;
+
+    bool HasActiveSession() const;
+
+    uint64_t GetElapsedSeconds() const;
+
+    void pause();
+
+    void play();
+
+    void reset();
 
     void FindRunning();
 

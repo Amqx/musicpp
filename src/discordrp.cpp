@@ -56,21 +56,21 @@ Discordrp::~Discordrp() {
 }
 
 void Discordrp::update() const {
-    if (!apple_music_->GetTitle().empty() && !apple_music_->GetArtist().empty() && !apple_music_->GetAlbum().empty() &&
-        enabled_) {
+    const Snapshot metadata = apple_music_->GetSnapshot(kSnapshotTypeDiscord);
+    if (!metadata.title.empty() && !metadata.artist.empty() && !metadata.album.empty() && enabled_) {
         discordpp::Activity activity;
 
-        const string title = DiscordBounds(apple_music_->GetTitle(), "Unknown Song");
-        const string artist = DiscordBounds(apple_music_->GetArtist(), "Unknown Artist");
-        const string album = DiscordBounds(apple_music_->GetAlbum(), "Unknown Album");
-        const string imglink = ConvertWString(apple_music_->GetImage());
-        const string amlink = ConvertWString(apple_music_->GetAmLink());
-        const string lfmlink = ConvertWString(apple_music_->GetLastFmLink());
-        const string splink = ConvertWString(apple_music_->GetSpotifyLink());
-        const bool playing = apple_music_->GetState();
-        const uint64_t start_ts = apple_music_->GetStartTs();
-        const uint64_t end_ts = apple_music_->GetEndTs();
-        const uint64_t pause_ts = apple_music_->GetPauseTimer();
+        const string title = DiscordBounds(metadata.title, "Unknown Song");
+        const string artist = DiscordBounds(metadata.artist, "Unknown Artist");
+        const string album = DiscordBounds(metadata.album, "Unknown Album");
+        const string imglink = ConvertWString(metadata.image);
+        const string amlink = ConvertWString(metadata.amlink);
+        const string lfmlink = ConvertWString(metadata.lfmlink);
+        const string splink = ConvertWString(metadata.splink);
+        const bool playing = metadata.state;
+        const uint64_t start_ts = metadata.start_ts;
+        const uint64_t end_ts = metadata.end_ts;
+        const uint64_t pause_ts = metadata.pause_timer;
 
         // Basic info
         activity.SetName(artist);
@@ -102,8 +102,7 @@ void Discordrp::update() const {
             timestamps.SetEnd(end_ts);
             activity.SetTimestamps(timestamps);
             if (logger_) {
-                logger_->debug("Timestamps (start, end): '{}' '{}'", apple_music_->GetStartTs(),
-                               apple_music_->GetEndTs());
+                logger_->debug("Timestamps (start, end): '{}' '{}'", start_ts, end_ts);
             }
         } else {
             timestamps.SetStart(pause_ts);
