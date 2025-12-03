@@ -301,3 +301,15 @@ wstring Truncate(const wstring &input) {
 
     return input.substr(0, kTrayMaxStrLen - 10) + L"..." + input.substr(len - 7);
 }
+
+wstring EscapeAmpersands(const wstring &s) {
+    wstring out;
+    for (const wchar_t c: s) {
+        if (c == L'&') {
+            out += L"&&";
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}

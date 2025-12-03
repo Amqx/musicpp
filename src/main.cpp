@@ -519,9 +519,9 @@ namespace {
                         const wstring album = ctx->player->GetAlbum();
                         if (ctx->player->HasActiveSession() && !title.empty() && !artist.empty() && !album.empty()) {
                             AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Now Playing");
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, Truncate(title).c_str());
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, Truncate(artist).c_str());
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, Truncate(album).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, EscapeAmpersands(Truncate(title)).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, EscapeAmpersands(Truncate(artist)).c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, EscapeAmpersands(Truncate(album)).c_str());
                             AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         }
 

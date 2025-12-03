@@ -45,4 +45,6 @@ xmlNodePtr FindMatchingListItem(const xmlNodePtr &node, const std::string &title
 
 std::wstring Truncate(const std::wstring &input);
 
+std::wstring EscapeAmpersands(const std::wstring &s);
+
 #endif //MUSICPP_STRINGUTILS_H
