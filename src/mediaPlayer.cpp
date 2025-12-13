@@ -2,9 +2,6 @@
 // Created by Jonathan on 25-Sep-25.
 //
 
-
-#include <iostream>
-#include <fcntl.h>
 #include <leveldb/db.h>
 #include <winrt/windows.media.control.h>
 #include <winrt/base.h>
@@ -50,62 +47,44 @@ MediaPlayer::~MediaPlayer() {
     }
 }
 
-wstring MediaPlayer::GetTitle() {
-    return this->title_;
-}
+Snapshot MediaPlayer::GetSnapshot(const int type) const {
+    Snapshot info = {};
 
-wstring MediaPlayer::GetArtist() {
-    return this->artist_;
-}
+    if (type == kSnapshotTypeDiscord) {
+        info.title = title_;
+        info.artist = artist_;
+        info.album = album_;
 
-wstring MediaPlayer::GetAlbum() {
-    return this->album_;
-}
+        if (!image_.empty()) info.image = image_;
+        else info.image = kDefaultImage;
 
-wstring MediaPlayer::GetImage() {
-    if (!this->image_.empty()) {
-        return this->image_;
+        info.amlink = amlink_;
+        info.lfmlink = lastfmlink_;
+        info.splink = spotify_link_;
+        info.start_ts = start_ts_;
+        info.end_ts = end_ts_;
+        info.state = playing_;
+        info.pause_timer = pause_time_;
     }
-    return kDefaultImage;
-}
 
-wstring MediaPlayer::GetImageSource() {
-    if (this->image_source_.empty()) {
-        return kUnknownSource;
+    if (type == kSnapshotTypeTime) {
+        info.album = album_; // needed to show whether there is valid data
+        info.image_source = image_source_;
+        info.elapsed = GetElapsedSeconds();
+        info.duration = total_time_;
+        info.state = playing_;
     }
-    return this->image_source_;
-}
 
-wstring MediaPlayer::GetAmLink() {
-    return this->amlink_;
-}
+    if (type == kSnapshotTypeTray) {
+        info.title = title_;
+        info.artist = artist_;
+        info.album = album_;
+        info.image = image_;
+        info.image_source = image_source_;
+        info.has_session = session_ != nullptr;
+    }
 
-wstring MediaPlayer::GetLastFmLink() {
-    return this->lastfmlink_;
-}
-
-wstring MediaPlayer::GetSpotifyLink() {
-    return this->spotify_link_;
-}
-
-uint64_t MediaPlayer::GetStartTs() const {
-    return this->start_ts_;
-}
-
-uint64_t MediaPlayer::GetEndTs() const {
-    return this->end_ts_;
-}
-
-bool MediaPlayer::GetState() const {
-    return this->playing_;
-}
-
-uint64_t MediaPlayer::GetPauseTimer() const {
-    return this->pause_time_;
-}
-
-uint64_t MediaPlayer::GetDurationSeconds() const {
-    return total_time_;
+    return info;
 }
 
 uint64_t MediaPlayer::GetElapsedSeconds() const {
@@ -125,8 +104,8 @@ uint64_t MediaPlayer::GetElapsedSeconds() const {
     }
 
     uint64_t elapsed = reference_time - this->start_ts_;
-    if (const uint64_t duration = GetDurationSeconds(); duration > 0 && elapsed > duration) {
-        elapsed = duration;
+    if (total_time_ > 0 && elapsed > total_time_) {
+        elapsed = total_time_;
     }
     return elapsed;
 }
@@ -192,7 +171,7 @@ void MediaPlayer::UpdateInfo() {
     const string sartist = ConvertWString(artist_);
     const string salbum = ConvertWString(album_);
     const auto start_time = this->start_ts_;
-    const auto duration = GetDurationSeconds();
+    const auto duration = total_time_;
 
     if (!(old_title != title_ || old_album != album_ || old_artist != artist_)) {
         if (const auto elapsed_time = GetElapsedSeconds();
@@ -213,51 +192,96 @@ void MediaPlayer::UpdateInfo() {
         return;
     }
 
-    const auto curr_time = UnixSecondsNow();
-
-    if (logger_)
-        logger_->info("Track changed: '{}' by '{}' on '{}'",
-                      ConvertWString(this->title_),
-                      ConvertWString(this->artist_),
-                      ConvertWString(this->album_));
-
-    this->image_.clear();
-    this->image_source_.clear();
-    this->amlink_.clear();
-    this->spotify_link_.clear();
-    this->lastfmlink_.clear();
-    this->set_now_playing_ = false;
-    this->scrobbled_ = false;
-    this->scrobbleattempts_ = 0;
-    this->nowplayingattempts_ = 0;
-
     ArtworkLog log;
-    const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
+    try {
+        const auto curr_time = UnixSecondsNow();
 
-    if (!set_now_playing_ && playing_) {
-        thread([this, stitle, sartist, salbum, duration] {
-            if (nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
-                if (lastfm_client_->UpdateNowPlaying(stitle, sartist, salbum, duration)) {
+        if (logger_)
+            logger_->info("Track changed: '{}' by '{}' on '{}'",
+                          ConvertWString(this->title_),
+                          ConvertWString(this->artist_),
+                          ConvertWString(this->album_));
+
+        this->image_.clear();
+        this->image_raw_ = properties.Thumbnail();
+        this->image_source_.clear();
+        this->amlink_.clear();
+        this->spotify_link_.clear();
+        this->lastfmlink_.clear();
+        this->set_now_playing_ = false;
+        this->scrobbled_ = false;
+        this->scrobbleattempts_ = 0;
+        this->nowplayingattempts_ = 0;
+        const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
+
+        if (!set_now_playing_ && playing_) {
+            thread([this, stitle, sartist, salbum, duration] {
+                if (nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
+                    if (lastfm_client_->UpdateNowPlaying(stitle, sartist, salbum, duration)) {
+                        this->set_now_playing_ = true;
+                    };
+                    nowplayingattempts_ += 1;
+                } else {
                     this->set_now_playing_ = true;
-                };
-                nowplayingattempts_ += 1;
-            } else {
-                this->set_now_playing_ = true;
-            }
-        }).detach();
+                }
+            }).detach();
+        }
+
+        if (db_) {
+            LoadDbImage(curr_time, song_key, log);
+            LoadAmLink(curr_time, song_key, log);
+            LoadLastFmLink(curr_time, song_key, log);
+            LoadSpotifyLink(curr_time, song_key, log);
+        }
+
+        FetchArtworkAm(curr_time, song_key, stitle, sartist, salbum, log);
+        FetchLastFmLink(curr_time, song_key, stitle, sartist, log);
+        FetchArtworkSpotify(curr_time, song_key, stitle, sartist, salbum, log);
+        FetchArtworkImgur(curr_time, song_key, image_raw_, log);
+    } catch (exception &e) {
+        if (logger_) logger_->error("Unknown error occured: {}", e.what());
     }
 
-    if (db_) {
-        LoadDbImage(curr_time, song_key, log);
-        LoadAmLink(curr_time, song_key, log);
-        LoadLastFmLink(curr_time, song_key, log);
-        LoadSpotifyLink(curr_time, song_key, log);
-    }
+    log.final_source = ConvertWString(this->image_source_);
+    log.final_url = ConvertWString(this->image_);
 
-    FetchArtworkAm(curr_time, song_key, stitle, sartist, salbum, log);
-    FetchLastFmLink(curr_time, song_key, stitle, sartist, log);
-    FetchArtworkSpotify(curr_time, song_key, stitle, sartist, salbum, log);
-    FetchArtworkImgur(curr_time, song_key, properties.Thumbnail(), log);
+    log_artwork(log);
+}
+
+void MediaPlayer::ImageRefresh() {
+    ArtworkLog log;
+    try {
+        const string stitle = ConvertWString(this->title_);
+        const string sartist = ConvertWString(artist_);
+        const string salbum = ConvertWString(album_);
+        const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
+        const auto curr_time = UnixSecondsNow();
+
+
+        if (logger_)
+            logger_->info("Forced image refresh requested: '{}' by '{}' on '{}'",
+                          ConvertWString(this->title_),
+                          ConvertWString(this->artist_),
+                          ConvertWString(this->album_));
+
+        this->image_.clear();
+        this->image_source_.clear();
+        this->amlink_.clear();
+        this->spotify_link_.clear();
+        this->lastfmlink_.clear();
+
+        db_->Delete(leveldb::WriteOptions(), song_key);
+        db_->Delete(leveldb::WriteOptions(), "musicppAM" + song_key);
+        db_->Delete(leveldb::WriteOptions(), "musicppLFM" + song_key);
+        db_->Delete(leveldb::WriteOptions(), "musicppSP" + song_key);
+
+        FetchArtworkAm(curr_time, song_key, stitle, sartist, salbum, log);
+        FetchLastFmLink(curr_time, song_key, stitle, sartist, log);
+        FetchArtworkSpotify(curr_time, song_key, stitle, sartist, salbum, log);
+        FetchArtworkImgur(curr_time, song_key, image_raw_, log);
+    } catch (exception &e) {
+        if (logger_) logger_->error("Unknown error occured: {}", e.what());
+    }
 
     log.final_source = ConvertWString(this->image_source_);
     log.final_url = ConvertWString(this->image_);
@@ -313,24 +337,6 @@ void MediaPlayer::reset() {
     this->set_now_playing_ = false;
     this->scrobbleattempts_ = 0;
     this->nowplayingattempts_ = 0;
-}
-
-void MediaPlayer::PrintInfo() const {
-    wcout << L"Player information" << endl;
-    wcout << L"=================================" << endl;
-    wcout << L"Title: " << title_ << endl;
-    wcout << L"Artist: " << artist_ << endl;
-    wcout << L"Album: " << album_ << endl;
-    wcout << L"Image url: " << image_ << endl;
-    wcout << L"Image source: " << image_source_ << endl;
-    wcout << L"Spotify link: " << spotify_link_ << endl;
-    wcout << L"Apple Music link: " << amlink_ << endl;
-    wcout << L"LastFM link: " << lastfmlink_ << endl;
-    wcout << L"Start timestamp (UNIX): " << start_ts_ << endl;
-    wcout << L"End timestamp (UNIX): " << end_ts_ << endl;
-    wcout << L"Total time: " << total_time_ << endl;
-    wcout << L"Currently playing: " << playing_ << endl;
-    wcout << L"Pause timer (UNIX): " << pause_time_ << endl;
 }
 
 void MediaPlayer::FindRunning() {

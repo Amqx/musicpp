@@ -299,7 +299,7 @@ wstring Truncate(const wstring &input) {
 
     const int len = input.length();
 
-    return input.substr(0, kTrayMaxStrLen - 10) + L"..." + input.substr(len - 7);
+    return input.substr(0, kTrayMaxStrLen - 12) + L"..." + input.substr(len - 9);
 }
 
 wstring EscapeAmpersands(const wstring &s) {

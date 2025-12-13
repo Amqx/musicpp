@@ -8,9 +8,11 @@
 #include <string>
 #include <winrt/windows.media.control.h>
 #include <leveldb/db.h>
+#include <atomic>
 #include "spotify.h"
 #include "imgur.h"
 #include "amscraper.h"
+#include "constants.h"
 #include "lfm.h"
 
 namespace spdlog {
@@ -40,6 +42,24 @@ struct ArtworkLog {
     std::string final_source;
 };
 
+struct Snapshot {
+    wstring title;
+    wstring artist;
+    wstring album;
+    wstring image;
+    wstring image_source;
+    wstring amlink;
+    wstring lfmlink;
+    wstring splink;
+    uint64_t start_ts = kInvalidTime;
+    uint64_t end_ts = kInvalidTime;
+    bool state = false;
+    bool has_session = false;
+    uint64_t pause_timer = kInvalidTime;
+    uint64_t duration = kInvalidTime;
+    uint64_t elapsed = kInvalidTime;
+};
+
 class MediaPlayer {
 public:
     MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
@@ -47,45 +67,11 @@ public:
 
     ~MediaPlayer();
 
-    [[nodiscard]] wstring GetTitle();
-
-    [[nodiscard]] wstring GetArtist();
-
-    [[nodiscard]] wstring GetAlbum();
-
-    [[nodiscard]] wstring GetImage();
-
-    [[nodiscard]] wstring GetImageSource();
-
-    [[nodiscard]] wstring GetAmLink();
-
-    [[nodiscard]] wstring GetLastFmLink();
-
-    [[nodiscard]] wstring GetSpotifyLink();
-
-    [[nodiscard]] uint64_t GetStartTs() const;
-
-    [[nodiscard]] uint64_t GetEndTs() const;
-
-    [[nodiscard]] bool GetState() const;
-
-    [[nodiscard]] bool HasActiveSession() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetPauseTimer() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetDurationSeconds() const;
-
-    [[nodiscard]] [[nodiscard]] uint64_t GetElapsedSeconds() const;
+    [[nodiscard]] Snapshot GetSnapshot(int type) const;
 
     void UpdateInfo();
 
-    void pause();
-
-    void play();
-
-    void reset();
-
-    void PrintInfo() const;
+    void ImageRefresh();
 
 private:
     leveldb::DB *db_;
@@ -93,6 +79,7 @@ private:
     wstring artist_;
     wstring album_;
     wstring image_;
+    IRandomAccessStreamReference image_raw_;
     wstring spotify_link_;
     wstring amlink_;
     wstring lastfmlink_;
@@ -100,19 +87,31 @@ private:
     uint64_t start_ts_ = std::numeric_limits<uint64_t>::max();
     uint64_t end_ts_ = std::numeric_limits<uint64_t>::max();
     uint64_t pause_time_ = std::numeric_limits<uint64_t>::max();
-    bool playing_ = false;
-    bool scrobbled_ = false;
-    bool set_now_playing_ = false;
+    atomic<bool> playing_ = false;
     wstring image_source_;
     SpotifyApi *spotify_client_;
     ImgurApi *imgur_client_;
     Amscraper *scraper_;
     spdlog::logger *logger_;
     Lfm *lastfm_client_;
-    int scrobbleattempts_ = 0;
-    int nowplayingattempts_ = 0;
+
+    atomic<int> scrobbleattempts_ = 0;
+    atomic<int> nowplayingattempts_ = 0;
+    atomic<bool> scrobbled_ = false;
+    atomic<bool> set_now_playing_ = false;
+
     Windows::Media::Control::GlobalSystemMediaTransportControlsSession session_ = nullptr;
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
+
+    bool HasActiveSession() const;
+
+    uint64_t GetElapsedSeconds() const;
+
+    void pause();
+
+    void play();
+
+    void reset();
 
     void FindRunning();
 
