@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from collections import defaultdict
 
 # Directory containing the log files
@@ -20,6 +21,8 @@ CACHE_FLAGS = {
     "written": "cache_written",
 }
 
+REFRESH_INTERVAL = 5  # seconds between updates
+
 
 def parse_flags(flag_string):
     if flag_string.strip() == "NONE":
@@ -27,14 +30,31 @@ def parse_flags(flag_string):
     return set(flag_string.split())
 
 
-def process_log_file(path, stats, cache_stats, line_count_ref):
+def get_newest_log_file():
+    """Find the most recently modified log file."""
+    log_files = [
+        os.path.join(LOG_DIR, f)
+        for f in os.listdir(LOG_DIR)
+        if f.lower().endswith(".log")
+    ]
+    if not log_files:
+        return None
+    return max(log_files, key=os.path.getmtime)
+
+
+def process_log_file(path, stats, cache_stats, line_count_ref, start_pos=0):
+    """Process log file from a given position, return new position."""
     with open(path, "r", encoding="utf-8", errors="ignore") as f:
+        f.seek(start_pos)
+        new_lines = 0
+        
         for line in f:
             m = FLAG_RE.search(line)
             if not m:
                 continue
 
             line_count_ref["count"] += 1
+            new_lines += 1
 
             flags = parse_flags(m.group(1))
 
@@ -56,6 +76,8 @@ def process_log_file(path, stats, cache_stats, line_count_ref):
                         stats[src]["available"] += 1
                     else:
                         stats[src]["unavailable"] += 1
+
+        return f.tell(), new_lines
 
 
 def compute_reliability(stats):
@@ -80,61 +102,113 @@ def compute_cache_stats(cache_stats):
     }
 
 
-def main():
-    if not os.path.isdir(LOG_DIR):
-        print(f"Log directory does not exist: {LOG_DIR}")
-        return
-
-    stats = {src: {"used": 0, "available": 0, "unavailable": 0} for src in SOURCES}
-
-    cache_stats = {
-        "total_entries": 0,
-        "hits": 0,
-        "expired": 0,
-        "written": 0,
-    }
-
-    line_count = {"count": 0}
-
-    for filename in os.listdir(LOG_DIR):
-        if filename.lower().endswith(".log"):
-            process_log_file(os.path.join(LOG_DIR, filename), stats, cache_stats, line_count)
-
+def print_stats(stats, cache_stats, line_count, current_file, new_lines=None):
+    """Print current statistics."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    
     reliability = compute_reliability(stats)
     cache_result = compute_cache_stats(cache_stats)
 
-    print("Summary")
-    print("Directory: ", LOG_DIR)
-    print(f"Total lines considered: {line_count['count']}")
-    print("-----------------------" + '-' * (line_count['count'] % 10))
+    print("=== CONTINUOUS LOG MONITOR ===")
+    print(f"Monitoring: {current_file}")
+    print(f"Last update: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    if new_lines is not None:
+        print(f"New entries: {new_lines}")
+    print(f"Total lines processed: {line_count['count']}")
+    print("=" * 50)
+    print()
 
+    print("Source Reliability")
+    print("-" * 50)
     for src in SOURCES:
         used = stats[src]["used"]
         avail = stats[src]["available"]
         unavail = stats[src]["unavailable"]
         r = reliability[src]
         if r is None:
-            print(f"{src}: no usage found")
+            print(f"{src:6s}: no usage found")
         else:
             if src == "imgur":
-                print(f"{src}: used={used}")
+                print(f"{src:6s}: used={used}")
             else:
                 print(
-                    f"{src}: reliability = {r:.5f} "
+                    f"{src:6s}: reliability = {r:.5f} "
                     f"(used={used}, available={avail}, unavailable={unavail})"
                 )
 
-    print("\nCache Statistics")
-    print("----------------")
+    print()
+    print("Cache Statistics")
+    print("-" * 50)
     if cache_stats["total_entries"] == 0:
         print("No log entries found")
     else:
-        print(f"cache hit rate      = {cache_result['hit_rate']:.5f}")
-        print(f"cache write rate    = {cache_result['write_rate']:.5f}")
+        print(f"Hit rate        : {cache_result['hit_rate']:.5f}")
+        print(f"Write rate      : {cache_result['write_rate']:.5f}")
         if cache_result["expiration_rate"] is None:
-            print("cache expiration rate = no cache hits found")
+            print("Expiration rate : no cache hits found")
         else:
-            print(f"cache expiration rate = {cache_result['expiration_rate']:.5f}")
+            print(f"Expiration rate : {cache_result['expiration_rate']:.5f}")
+
+    print()
+    print(f"(Refreshing every {REFRESH_INTERVAL} seconds, press Ctrl+C to stop)")
+
+
+def main():
+    if not os.path.isdir(LOG_DIR):
+        print(f"Log directory does not exist: {LOG_DIR}")
+        return
+
+    stats = {src: {"used": 0, "available": 0, "unavailable": 0} for src in SOURCES}
+    cache_stats = {
+        "total_entries": 0,
+        "hits": 0,
+        "expired": 0,
+        "written": 0,
+    }
+    line_count = {"count": 0}
+
+    current_file = get_newest_log_file()
+    if not current_file:
+        print("No log files found in directory")
+        return
+
+    # Initial full scan of all log files
+    print("Performing initial scan of all log files...")
+    for filename in os.listdir(LOG_DIR):
+        if filename.lower().endswith(".log"):
+            filepath = os.path.join(LOG_DIR, filename)
+            process_log_file(filepath, stats, cache_stats, line_count)
+
+    # Get position in newest file after initial scan
+    file_pos = os.path.getsize(current_file)
+
+    print_stats(stats, cache_stats, line_count, current_file)
+
+    # Continuous monitoring loop
+    try:
+        while True:
+            time.sleep(REFRESH_INTERVAL)
+
+            # Check if log file has changed
+            newest_file = get_newest_log_file()
+            if newest_file != current_file:
+                # New log file detected, process it from the beginning
+                current_file = newest_file
+                file_pos = 0
+
+            # Process new entries
+            new_pos, new_lines = process_log_file(
+                current_file, stats, cache_stats, line_count, file_pos
+            )
+            file_pos = new_pos
+
+            # Update display
+            print_stats(stats, cache_stats, line_count, current_file, new_lines)
+
+    except KeyboardInterrupt:
+        print("\n\nMonitoring stopped by user")
+        print("\nFinal Statistics:")
+        print_stats(stats, cache_stats, line_count, current_file)
 
 
 if __name__ == "__main__":

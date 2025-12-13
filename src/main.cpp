@@ -2,31 +2,31 @@
 // Created by Jonathan on 25-Sep-25.
 //
 
-#include <chrono>
-#include <thread>
-#include <iostream>
+#include "lfm.h"
+#include "consoleutils.h"
+#include "constants.h"
+#include "credhelper.h"
+#include "discordrp.h"
+#include "imgur.h"
+#include "mediaPlayer.h"
+#include "spotify.h"
+#include "stringutils.h"
+#include "timeutils.h"
 #include <Windows.h>
+#include <chrono>
 #include <conio.h>
-#include <leveldb/db.h>
-#include <shlobj_core.h>
 #include <filesystem>
+#include <iomanip>
+#include <iostream>
+#include <leveldb/db.h>
 #include <shellapi.h>
-#include <sstream>
-#include <spdlog/spdlog.h>
+#include <shlobj_core.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <spdlog/spdlog.h>
+#include <sstream>
+#include <thread>
 #include <unordered_set>
 #include <vector>
-#include <iomanip>
-#include "lfm.h"
-#include "timeutils.h"
-#include "consoleutils.h"
-#include "stringutils.h"
-#include "constants.h"
-#include "mediaPlayer.h"
-#include "imgur.h"
-#include "spotify.h"
-#include "discordrp.h"
-#include "credhelper.h"
 
 using namespace std;
 
@@ -65,6 +65,7 @@ namespace {
     constexpr UINT ID_TRAY_LASTFM_TOGGLE = 1006;
     constexpr UINT ID_TRAY_FORCE_REFRESH = 1007;
     constexpr UINT ID_COPY_IMAGE = 1008;
+    constexpr UINT ID_COPY_TITLE_ARTIST_ALBUM = 1009;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
     const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
@@ -462,16 +463,13 @@ namespace {
 
         switch (msg) {
             case WM_CREATE: {
-                // Setup Tray Icon
+                const auto *create_struct = reinterpret_cast<CREATESTRUCT *>(lParam);
 
-                auto *createStruct = reinterpret_cast<CREATESTRUCT *>(lParam);
-
-                ctx = static_cast<AppContext *>(createStruct->lpCreateParams);
+                ctx = static_cast<AppContext *>(create_struct->lpCreateParams);
 
                 SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(ctx));
 
                 ctx->hWnd = hWnd;
-
 
                 ctx->nid.cbSize = sizeof(ctx->nid);
 
@@ -487,14 +485,11 @@ namespace {
 
                 if (!ctx->nid.hIcon) ctx->nid.hIcon = LoadIcon(nullptr, IDI_APPLICATION); // Fallback
 
-
                 lstrcpynW(ctx->nid.szTip, L"MusicPP", ARRAYSIZE(ctx->nid.szTip));
 
                 Shell_NotifyIcon(NIM_ADD, &ctx->nid);
 
                 if (ctx->logger) ctx->logger->info("Window created and tray icon added");
-
-                // Start Timers
 
                 SetTimer(hWnd, DATA_TIMER_ID, kLoopRefreshInterval, nullptr);
 
@@ -518,12 +513,13 @@ namespace {
                         const wstring v = L"MusicPP V" + kVersion;
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
                         const wstring title = metadata.title;
                         const wstring artist = metadata.artist;
                         const wstring album = metadata.album;
                         if (metadata.has_session && !title.empty() && !artist.empty() && !album.empty()) {
-                            AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Now Playing");
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE_ARTIST_ALBUM, L"Now Playing");
                             AppendMenu(hMenu, MF_STRING, ID_COPY_TITLE, EscapeAmpersands(Truncate(title)).c_str());
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, EscapeAmpersands(Truncate(artist)).c_str());
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, EscapeAmpersands(Truncate(album)).c_str());
@@ -614,16 +610,19 @@ namespace {
                     }
 
                     case ID_TRAY_FORCE_REFRESH: {
-                        if (ctx->logger) ctx->logger->info("User forced an image refresh");
                         ctx->player->ImageRefresh();
+                        return 0;
+                    }
+
+                    case ID_COPY_TITLE_ARTIST_ALBUM: {
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        CopyToClipboard(ctx, metadata.title + L"\r\n" + metadata.artist + L"\r\n" + metadata.album);
                         return 0;
                     }
 
                     default: {
                         return 0;
                     }
-
-
                 }
             }
 

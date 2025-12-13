@@ -47,8 +47,7 @@ MediaPlayer::~MediaPlayer() {
     }
 }
 
-Snapshot MediaPlayer::GetSnapshot(const int type) {
-    shared_lock lock(state_mutex_);
+Snapshot MediaPlayer::GetSnapshot(const int type) const {
     Snapshot info = {};
 
     if (type == kSnapshotTypeDiscord) {
@@ -85,7 +84,6 @@ Snapshot MediaPlayer::GetSnapshot(const int type) {
         info.has_session = session_ != nullptr;
     }
 
-    lock.unlock();
     return info;
 }
 
@@ -135,8 +133,6 @@ void MediaPlayer::UpdateInfo() {
         return;
     }
 
-    unique_lock lock(state_mutex_);
-
     try {
         UpdatePlaybackState(session_.GetPlaybackInfo());
         UpdateTimeline(session_.GetTimelineProperties());
@@ -146,7 +142,6 @@ void MediaPlayer::UpdateInfo() {
         }
         reset();
         session_ = nullptr;
-        lock.unlock();
         return;
     }
 
@@ -164,13 +159,11 @@ void MediaPlayer::UpdateInfo() {
         }
         reset();
         session_ = nullptr;
-        lock.unlock();
         return;
     }
 
     if (!UpdateMetadata(properties)) {
         reset();
-        lock.unlock();
         return;
     }
 
@@ -199,8 +192,6 @@ void MediaPlayer::UpdateInfo() {
         return;
     }
 
-    // ALWAYS FORCE A REFRESH ON NEW SONG
-    refresh_in_progress_ = true;
     ArtworkLog log;
     try {
         const auto curr_time = UnixSecondsNow();
@@ -250,8 +241,6 @@ void MediaPlayer::UpdateInfo() {
     } catch (exception &e) {
         if (logger_) logger_->error("Unknown error occured: {}", e.what());
     }
-    refresh_in_progress_ = false;
-    lock.unlock();
 
     log.final_source = ConvertWString(this->image_source_);
     log.final_url = ConvertWString(this->image_);
@@ -260,10 +249,6 @@ void MediaPlayer::UpdateInfo() {
 }
 
 void MediaPlayer::ImageRefresh() {
-    if (refresh_in_progress_) return;
-
-    unique_lock lock(state_mutex_);
-    refresh_in_progress_ = true;
     ArtworkLog log;
     try {
         const string stitle = ConvertWString(this->title_);
@@ -297,9 +282,6 @@ void MediaPlayer::ImageRefresh() {
     } catch (exception &e) {
         if (logger_) logger_->error("Unknown error occured: {}", e.what());
     }
-
-    lock.unlock();
-    refresh_in_progress_ = false;
 
     log.final_source = ConvertWString(this->image_source_);
     log.final_url = ConvertWString(this->image_);

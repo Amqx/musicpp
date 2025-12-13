@@ -8,8 +8,7 @@
 #include <string>
 #include <winrt/windows.media.control.h>
 #include <leveldb/db.h>
-#include <shared_mutex>
-
+#include <atomic>
 #include "spotify.h"
 #include "imgur.h"
 #include "amscraper.h"
@@ -44,14 +43,14 @@ struct ArtworkLog {
 };
 
 struct Snapshot {
-    wstring title = L"";
-    wstring artist = L"";
-    wstring album = L"";
-    wstring image = L"";
-    wstring image_source = L"";
-    wstring amlink = L"";
-    wstring lfmlink = L"";
-    wstring splink = L"";
+    wstring title;
+    wstring artist;
+    wstring album;
+    wstring image;
+    wstring image_source;
+    wstring amlink;
+    wstring lfmlink;
+    wstring splink;
     uint64_t start_ts = kInvalidTime;
     uint64_t end_ts = kInvalidTime;
     bool state = false;
@@ -68,7 +67,7 @@ public:
 
     ~MediaPlayer();
 
-    [[nodiscard]] Snapshot GetSnapshot(int type);
+    [[nodiscard]] Snapshot GetSnapshot(int type) const;
 
     void UpdateInfo();
 
@@ -88,22 +87,21 @@ private:
     uint64_t start_ts_ = std::numeric_limits<uint64_t>::max();
     uint64_t end_ts_ = std::numeric_limits<uint64_t>::max();
     uint64_t pause_time_ = std::numeric_limits<uint64_t>::max();
-    bool playing_ = false;
-    bool scrobbled_ = false;
-    bool set_now_playing_ = false;
+    atomic<bool> playing_ = false;
     wstring image_source_;
     SpotifyApi *spotify_client_;
     ImgurApi *imgur_client_;
     Amscraper *scraper_;
     spdlog::logger *logger_;
     Lfm *lastfm_client_;
-    int scrobbleattempts_ = 0;
-    int nowplayingattempts_ = 0;
+
+    atomic<int> scrobbleattempts_ = 0;
+    atomic<int> nowplayingattempts_ = 0;
+    atomic<bool> scrobbled_ = false;
+    atomic<bool> set_now_playing_ = false;
+
     Windows::Media::Control::GlobalSystemMediaTransportControlsSession session_ = nullptr;
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
-
-    shared_mutex state_mutex_;
-    atomic_bool refresh_in_progress_ = false;
 
     bool HasActiveSession() const;
 
