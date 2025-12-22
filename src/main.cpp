@@ -289,7 +289,7 @@ namespace {
 
         if (!it->status().ok()) {
             if (ctx.logger) ctx.logger->error("Iterator error during database cleaning: {}", it->status().ToString());
-            wcout << console::Yellow << "Error during db cleanup, check logs" << console::Reset << endl;
+            wcout << console::Yellow << L"Error during db cleanup, check logs" << console::Reset << endl;
             return;
         }
 
@@ -297,7 +297,7 @@ namespace {
             const leveldb::Status s = ctx.db->Write(wo, &batch);
             if (!s.ok()) {
                 if (ctx.logger) ctx.logger->error("Failed to delete items from cache! Error: {}", s.ToString());
-                wcout << console::Yellow << "Error during db cleanup, check logs" << console::Reset << endl;
+                wcout << console::Yellow << L"Error during db cleanup, check logs" << console::Reset << endl;
                 return;
             }
             if (ctx.logger) ctx.logger->info("Purged {} keys ({} malformed)", deleted, malformed);
