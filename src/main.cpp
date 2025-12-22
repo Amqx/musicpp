@@ -650,7 +650,7 @@ namespace {
                     if (const HMENU hMenu = CreatePopupMenu()) {
                         const wstring v = L"MusicPP V" + kVersion;
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
-                        AppendMenu(hMenu, MF_STRING, ID_PURGE_DATABASE, L"Purge Databse");
+                        AppendMenu(hMenu, MF_STRING, ID_PURGE_DATABASE, L"Purge Database");
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
 
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
