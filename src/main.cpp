@@ -479,7 +479,7 @@ namespace {
                                                     L"https://www.last.fm/api/account/create", force_reset,
                                                     ctx.logger.get());
 
-        wcout << "All APIKeys found" << endl;
+        wcout << L"All APIKeys found" << endl;
         if (ctx.logger) {
             ctx.logger->info("All API keys loaded successfully");
         }
