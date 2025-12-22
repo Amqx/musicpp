@@ -11,6 +11,7 @@
 #include "utils.h"
 #include "constants.h"
 #include "stringutils.h"
+#include "consoleutils.h"
 #include "timeutils.h"
 #include "credhelper.h"
 
@@ -51,7 +52,7 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, leveldb::DB *d
         }
     }
 
-    if (const string session = ConvertWString(ReadGenericCredential(L"lastfm_sessionkey", logger));
+    if (const string session = ConvertWString(ReadGenericCredential(kLastFmDbSessionKey, logger));
         !session.empty() && AuthTestSession(session)) {
         if (logger) {
             logger->info("Successfully verified with LastFM using saved session key");
@@ -60,7 +61,7 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, leveldb::DB *d
         valid_ = true;
         return;
     }
-    DeleteGenericCredential(L"lastfm_sessionkey", logger);
+    DeleteGenericCredential(kLastFmDbSessionKey, logger);
 
     const string token = AuthRequestToken();
     if (token.empty()) {
@@ -74,8 +75,12 @@ Lfm::Lfm(const std::string &apikey, const std::string &apisecret, leveldb::DB *d
         }
         return;
     }
-    wcout << L"Go to the following link to authorize LastFM:\n" << L"https://www.last.fm/api/auth/?api_key=" +
-            wstring(ConvertToWString(apikey)) + L"&token=" + ConvertToWString(token) << endl;
+
+    const wstring auth_url = L"https://www.last.fm/api/auth/?api_key=" +
+                             wstring(ConvertToWString(apikey)) + L"&token=" + ConvertToWString(token);
+    wcout << L"Go to the following link to authorize LastFM:\n";
+    wcout << console::Blue << console::LinkStart << auth_url << console::LinkST << auth_url << console::LinkEnd <<
+            console::Reset << endl;
     wcout << L"\nThis program checks for success every 15 seconds.";
     wcout << L"You can press Enter or ESC at any time to cancel." << endl;
     time_t timer = 0;
@@ -266,7 +271,7 @@ bool Lfm::AuthGetSession(const std::string &token) {
             wcout << L"Authenticated as: " << ConvertToWString(name) << endl;
             session_key_ = j["session"]["key"];
             valid_ = true;
-            WriteGenericCredential(L"lastfm_sessionkey", wstring(ConvertToWString(session_key_)));
+            WriteGenericCredential(kLastFmDbSessionKey, wstring(ConvertToWString(session_key_)));
             if (logger_) {
                 logger_->info("Successfully grabbed new LastFM SessionKey");
                 wcout << L"Grabbed new LastFM session key" << endl;

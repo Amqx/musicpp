@@ -33,7 +33,17 @@ void SetupConsole() {
 
     _setmode(_fileno(stderr), _O_U8TEXT);
 
+    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hOut != INVALID_HANDLE_VALUE) {
+        DWORD dwMode = 0;
+        if (GetConsoleMode(hOut, &dwMode)) {
+            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+            SetConsoleMode(hOut, dwMode);
+        }
+    }
+
     wcout << L"MusicPP V" << kVersion << endl;
+    wcout << console::Green << L"------------------------------------------------\n" << console::Reset << endl;
 }
 
 

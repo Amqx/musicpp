@@ -64,7 +64,6 @@ constexpr int kMaxSetNowPlayingAttempts = 3; // Max tries to set last.fm's now p
 constexpr int kLfmMinTime = 30; // Min time for a song to be considered for scrobbling
 constexpr double kLfmPercentage = 0.75; // Min percentage for a song to be scrobbled
 constexpr int kLfmElapsedTime = 240; // Min time before a song is force scrobbled
-const std::string kLfmStateKey = "config:lastfm";
 
 // Apple Music Web Scraper
 const std::string kTargetSize = "800x800bb-60";
@@ -75,15 +74,18 @@ const std::string kTargetSize = "800x800bb-60";
 constexpr uint64_t kDiscordApikey = 1358389458956976128; // Discord application api key
 constexpr int kDiscordMaxStrLen = 128; // The max length of a string in a Discord activity is 128 - do not change!
 constexpr std::chrono::milliseconds kDiscordRefreshInterval(10); // Recommended Discord value
-const std::string kDiscordStateKey = "config:discord";
 
 // Database Keys
-constexpr char kRegionDbKey[] = "config:region";
+const std::string kRegionDbKey = "config:region";
+const std::string kDiscordStateKey = "config:discord";
+const std::string kLfmStateKey = "config:lastfm";
 const std::wstring kSpotifyDbClientIdKey = L"musicpp/spotify_client_id";
 const std::wstring kSpotifyDbClientSecretKey = L"musicpp/spotify_client_secret";
+const std::wstring kSpotifyDbClientToken = L"musicpp/spotify_client_token";
 const std::wstring kImgurDbClientIdKey = L"musicpp/imgur_client_id";
 const std::wstring kLastFmDbApikey = L"musicpp/lastfm_api_key";
 const std::wstring kLastFmDbSecret = L"musicpp/lastfm_secret";
+const std::wstring kLastFmDbSessionKey = L"musicpp/lastfm_sessionkey";
 
 // Others
 constexpr uint64_t kWindowsTsConversion = 10'000'000;

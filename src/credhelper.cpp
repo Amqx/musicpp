@@ -61,12 +61,11 @@ std::wstring ReadGenericCredential(const std::wstring &target_name, spdlog::logg
     std::wstring credential_buffer;
     PCREDENTIALW p_cred = nullptr; // Pointer to receive the credential structure
 
-    // 1. Call CredReadW
     const BOOL success = CredReadW(
-        target_name.c_str(), // Target name
-        CRED_TYPE_GENERIC, // Type
-        0, // Flags (must be 0)
-        &p_cred // Pointer to the result
+        target_name.c_str(),
+        CRED_TYPE_GENERIC,
+        0,
+        &p_cred
     );
 
     if (success && p_cred != nullptr) {
