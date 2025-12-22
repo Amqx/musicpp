@@ -219,7 +219,7 @@ SearchResult SpotifyApi::SearchTracks(const string &title, const string &artist,
 }
 
 bool SpotifyApi::RequestToken() {
-    if (wstring spotify_client_token = ReadGenericCredential(L"spotify_client_token"); !spotify_client_token.empty()) {
+    if (wstring spotify_client_token = ReadGenericCredential(kSpotifyDbClientToken); !spotify_client_token.empty()) {
         if (const auto split = spotify_client_token.find(L'|'); split != string::npos) {
             const auto timestamp = stoi(spotify_client_token.substr(split + 1));
 
@@ -286,7 +286,7 @@ bool SpotifyApi::RequestToken() {
         access_token_ = token;
         last_refresh_time_ = curr_time;
         const wstring saved = ConvertToWString(access_token_) + L"|" + to_wstring(curr_time);
-        WriteGenericCredential(L"spotify_client_token", saved);
+        WriteGenericCredential(kSpotifyDbClientToken, saved);
         if (logger_) {
             logger_->info("Successfully requested new Spotify token.");
         }

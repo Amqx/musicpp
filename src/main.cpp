@@ -19,6 +19,7 @@
 #include <iomanip>
 #include <iostream>
 #include <leveldb/db.h>
+#include <leveldb/write_batch.h>
 #include <shellapi.h>
 #include <shlobj_core.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -66,6 +67,7 @@ namespace {
     constexpr UINT ID_TRAY_FORCE_REFRESH = 1007;
     constexpr UINT ID_COPY_IMAGE = 1008;
     constexpr UINT ID_COPY_TITLE_ARTIST_ALBUM = 1009;
+    constexpr UINT ID_PURGE_DATABASE = 1010;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
     const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
@@ -104,7 +106,8 @@ namespace {
                 error_code ec;
                 filesystem::remove(files[i], ec);
                 if (ec) {
-                    wcout << L"Failed to remove old log file: " << ConvertToWString(files[i].path().string()) << endl;;
+                    wcout << console::Yellow << L"Failed to remove old log file: " << ConvertToWString(
+                        files[i].path().string()) << console::Reset << endl;
                 }
             }
         }
@@ -178,11 +181,141 @@ namespace {
         return region;
     }
 
+    void PurgeDatabase(const AppContext *ctx) {
+        if (!ctx->db) {
+            if (ctx->logger) ctx->logger->warn("Attempted to purge unavailable database");
+            return;
+        }
+
+        leveldb::WriteBatch batch;
+        leveldb::ReadOptions ro;
+        ro.fill_cache = false;
+        unique_ptr<leveldb::Iterator> it(ctx->db->NewIterator(ro));
+        if (!it) {
+            if (ctx->logger) ctx->logger->warn("Failed to get iterator for db purge");
+            return;
+        }
+
+        int count = 0;
+        for (it->SeekToFirst(); it->Valid(); it->Next()) {
+            const leveldb::Slice key = it->key();
+
+            if (key == kDiscordStateKey || key == kLfmStateKey || key == kRegionDbKey) {
+                continue;
+            }
+
+            batch.Delete(key);
+            count++;
+        }
+
+        if (!it->status().ok()) {
+            if (ctx->logger) ctx->logger->error("Iterator error during purge: {}", it->status().ToString());
+            return;
+        }
+
+        const leveldb::Status s = ctx->db->Write(leveldb::WriteOptions(), &batch);
+        if (s.ok()) {
+            if (ctx->logger) ctx->logger->info("Successfully wiped {} items from the cache", count);
+            if (count > 0) ctx->db->CompactRange(nullptr, nullptr);
+        } else {
+            if (ctx->logger) ctx->logger->error("Failed to delete items from cache! Error: {}", s.ToString());
+        }
+        ctx->player->ImageRefresh();
+    }
+
+    void CleanDatabase(const AppContext &ctx) {
+        if (ctx.logger) ctx.logger->info("Beginning database purge: checking for keys older than {}s", kDbExpireTime);
+        wcout << L"Cleaning database of keys older than " << kDbExpireTime << "s" << endl;
+        const uint64_t now = UnixSecondsNow();
+
+        leveldb::ReadOptions ro;
+        leveldb::WriteOptions wo;
+        ro.fill_cache = false;
+        wo.sync = true;
+
+        unique_ptr<leveldb::Iterator> it(ctx.db->NewIterator(ro));
+        if (!it) {
+            if (ctx.logger) ctx.logger->warn("Failed to get iterator for db purge");
+            wcout << console::Yellow << L"Error during db cleanup, check logs" << console::Reset << endl;
+            return;
+        }
+
+        leveldb::WriteBatch batch;
+
+        size_t deleted = 0;
+        size_t malformed = 0;
+
+        auto ParseEpochPrefix = [&](const string &value, uint64_t &out_seconds) {
+            const size_t sep = value.find('|');
+            if (sep == string::npos || sep == 0) return false;
+
+            out_seconds = std::stoull(value.substr(0, sep));
+            return true;
+        };
+
+        for (it->SeekToFirst(); it->Valid(); it->Next()) {
+            const leveldb::Slice key = it->key();
+            if (key == kDiscordStateKey || key == kLfmStateKey || key == kRegionDbKey) {
+                continue;
+            }
+
+            const leveldb::Slice val = it->value();
+            bool should_delete = false;
+
+            try {
+                uint64_t stored;
+                if (!ParseEpochPrefix(val.ToString(), stored)) {
+                    should_delete = true;
+                    malformed++;
+                } else {
+                    if (stored > now) {
+                        should_delete = true;
+                        malformed++;
+                    } else if (now - stored > kDbExpireTime) {
+                        should_delete = true;
+                    }
+                }
+            } catch (exception &e) {
+                should_delete = true;
+                if (ctx.logger) ctx.logger->warn("Found extremely malformed value (error: {}): {}", e.what(),
+                                                 val.ToString());
+            }
+
+            if (should_delete) {
+                batch.Delete(key);
+                deleted++;
+            }
+        }
+
+        if (!it->status().ok()) {
+            if (ctx.logger) ctx.logger->error("Iterator error during database cleaning: {}", it->status().ToString());
+            wcout << console::Yellow << "Error during db cleanup, check logs" << console::Reset << endl;
+            return;
+        }
+
+        if (deleted > 0) {
+            const leveldb::Status s = ctx.db->Write(wo, &batch);
+            if (!s.ok()) {
+                if (ctx.logger) ctx.logger->error("Failed to delete items from cache! Error: {}", s.ToString());
+                wcout << console::Yellow << "Error during db cleanup, check logs" << console::Reset << endl;
+                return;
+            }
+            if (ctx.logger) ctx.logger->info("Purged {} keys ({} malformed)", deleted, malformed);
+            wcout << L"Purged " << deleted << L" keys from the database (" << malformed << L" malformed keys)" << endl;
+            ctx.db->CompactRange(nullptr, nullptr);
+        } else {
+            if (ctx.logger) ctx.logger->info("Nothing to purge");
+            wcout << L"Nothing to purge!" << endl;
+        }
+
+        wcout << endl;
+    }
+
     bool InitializeDatabase(AppContext &ctx) {
         PWSTR path = nullptr;
 
         if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
-            wcout << L"Fatal: could not get local appdata path" << endl;
+            wcout << console::Red << L"Fatal: could not get local appdata path" << console::Reset << endl;
 
             return false;
         }
@@ -200,12 +333,13 @@ namespace {
         create_directories(log_path, ec2);
 
         if (ec1) {
-            wcout << L"Fatal: Could not create db folder: " << ec1.message().c_str() << endl;
+            wcout << console::Red << L"Fatal: Could not create db folder: " << ec1.message().c_str() << console::Reset
+                    << endl;
             return false;
         }
 
         if (ec2) {
-            wcout << L"Could not create log folder: " << ec2.message().c_str() << endl;
+            wcout << console::Red << L"Could not create log folder: " << ec2.message().c_str() << console::Reset << endl;
             wcout << L"The program will not have logs. Continuing..." << endl;
         } else {
             PruneLogs(log_path);
@@ -241,18 +375,17 @@ namespace {
         if (status.ok()) {
             ctx.db.reset(temp_db);
             if (ctx.logger) ctx.logger->info("Database initialized at path: {}", db_path.string());
+            CleanDatabase(ctx);
             return true;
         }
 
-        wcout << L"Fatal: Could not initialize database!" << endl;
+        wcout << console::Red << L"Fatal: Could not initialize database!" << console::Reset << endl;
         if (ctx.logger) ctx.logger->error("Could not initialize database: {}", status.ToString());
 
         return false;
     }
 
     bool RunConfigurationMode(const AppContext &ctx, string &region) {
-        wcout << L"------------------------------------------------\n" << endl;
-
         wcout << L"Press ANY KEY to enter Configuration/Reset mode." << endl;
 
 
@@ -261,7 +394,7 @@ namespace {
         for (int i = 3; i > 0; --i) {
             wcout << L"Launching in " << i << L" seconds... \r" << flush;
 
-            for (int j = 0; j < 10; ++j) {
+            for (int j = 0; j < 20; ++j) {
                 if (_kbhit()) {
                     (void) _getch(); // consume key
 
@@ -279,7 +412,7 @@ namespace {
 
         if (interaction) {
             if (ctx.logger) ctx.logger->info("User interaction detected, entering Configuration Mode.");
-            wcout << L"\n\n[Configuration Mode]" << endl;
+            wcout << console::Green << L"\n\n[Configuration Mode]" << console::Reset << endl;
 
             wcout << L"Enter 1 to force reset all API Keys" << endl;
 
@@ -312,7 +445,7 @@ namespace {
             }
         } else {
             if (ctx.logger) ctx.logger->info("Auto-Start mode, no user interaction");
-            wcout << L"\n\n[Auto-Start] No interaction detected. Loading keys..." << endl;
+            wcout << L"\n[Auto-Start] No interaction detected. Loading keys..." << endl;
         }
 
         return false;
@@ -320,6 +453,11 @@ namespace {
 
     void LoadCredentials(AppContext &ctx, const bool &force_reset, const string &region) {
         wcout << L"\nChecking API Keys..." << endl;
+
+        if (force_reset) {
+            DeleteGenericCredential(kLastFmDbSessionKey, ctx.logger.get());
+            DeleteGenericCredential(kSpotifyDbClientToken, ctx.logger.get());
+        }
 
         const wstring s_cid = EnsureCredential(kSpotifyDbClientIdKey, L"Spotify Client ID",
                                                L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
@@ -341,13 +479,13 @@ namespace {
                                                     L"https://www.last.fm/api/account/create", force_reset,
                                                     ctx.logger.get());
 
-        wcout << "\nAll APIKeys found" << endl;
+        wcout << "All APIKeys found" << endl;
         if (ctx.logger) {
             ctx.logger->info("All API keys loaded successfully");
         }
 
         // Initialize API and Player objects
-        wcout << L"Apple Music region: " << region.c_str() << endl;
+        wcout << L"\nApple Music region: " << region.c_str() << endl;
         ctx.scraper = std::make_unique<Amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
@@ -512,6 +650,7 @@ namespace {
                     if (const HMENU hMenu = CreatePopupMenu()) {
                         const wstring v = L"MusicPP V" + kVersion;
                         AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
+                        AppendMenu(hMenu, MF_STRING, ID_PURGE_DATABASE, L"Purge Databse");
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
 
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
@@ -567,6 +706,12 @@ namespace {
 
             case WM_COMMAND: {
                 switch (LOWORD(wParam)) {
+                    case ID_PURGE_DATABASE: {
+                        if (ctx->logger) ctx->logger->info("User requested database purge");
+                        PurgeDatabase(ctx);
+                        return 0;
+                    }
+
                     case ID_TRAY_EXIT: {
                         if (ctx->logger) ctx->logger->info("User requested application exit via tray menu.");
                         SendMessage(hWnd, WM_CLOSE, 0, 0);
@@ -691,7 +836,7 @@ int WINAPI WinMain(const HINSTANCE hInstance, const HINSTANCE hPrevInstance, con
     LoadCredentials(ctx, force_reset, region);
     if (ctx.logger) ctx.logger->info("Load credentials finished");
 
-    wcout << "\nThis console window will automatically close in 3 seconds" << endl;
+    wcout << "\nThis console window will close automatically" << endl;
 
     for (int i = 3; i > 0; --i) {
         wcout << L"Closing in " << i << L" seconds... \r" << flush;
