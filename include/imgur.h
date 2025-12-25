@@ -28,6 +28,8 @@ public:
 
     [[nodiscard]] string UploadImage(const IRandomAccessStreamReference &stream_ref) const;
 
+    [[nodiscard]] string UploadImage(const vector<uint8_t> &gif) const;
+
 private:
     string client_id_;
 
