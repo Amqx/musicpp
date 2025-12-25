@@ -18,6 +18,16 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(leveldb CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(LibXml2 CONFIG REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
+        libavdevice
+        libavfilter
+        libavformat
+        libavcodec
+        libswresample
+        libswscale
+        libavutil
+)
 
 # discordsdk config
 set(DISCORD_SDK_ROOT "${CMAKE_SOURCE_DIR}/discordsdk")
@@ -46,8 +56,9 @@ add_executable(musicpp
         src/stringutils.cpp
         src/utils.cpp
         src/amscraper.cpp
-        include/amscraper.h
         src/lfm.cpp
+        src/m3u8_internals.cpp
+        src/m3u8.cpp
 )
 
 target_compile_definitions(musicpp PRIVATE -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T)
@@ -59,7 +70,7 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 set_target_properties(musicpp PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} Advapi32 leveldb::leveldb Shell32 spdlog::spdlog LibXml2::LibXml2)
+target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} Advapi32 leveldb::leveldb Shell32 spdlog::spdlog LibXml2::LibXml2 PkgConfig::LIBAV)
 target_include_directories(musicpp PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
 target_compile_definitions(musicpp PRIVATE UNICODE _UNICODE)
 

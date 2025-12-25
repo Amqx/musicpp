@@ -1,3 +1,2 @@
 #include "constants.h"
-
 IDI_APPICON ICON "app-icon.ico"

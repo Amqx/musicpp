@@ -37,7 +37,7 @@ SearchResult Amscraper::SearchTracks(const std::string &title, const std::string
     CURL *curl = curl_easy_init();
     if (!curl) {
         if (logger_) {
-            logger_->warn("Failed to initialize CURL for Apple Music searchTracks.");
+            logger_->warn("Failed to initialize CURL for Apple Music searchTracks");
         }
         return results;
     }
