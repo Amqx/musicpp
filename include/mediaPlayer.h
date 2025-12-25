@@ -14,6 +14,7 @@
 #include "amscraper.h"
 #include "constants.h"
 #include "lfm.h"
+#include "m3u8.h"
 
 namespace spdlog {
     class logger;
@@ -62,7 +63,8 @@ struct Snapshot {
 
 class MediaPlayer {
 public:
-    MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
+    MediaPlayer(Amscraper *scraper, M3U8Processor *processor, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm,
+                leveldb::DB *database,
                 spdlog::logger *logger = nullptr);
 
     ~MediaPlayer();
@@ -79,6 +81,8 @@ private:
     wstring artist_;
     wstring album_;
     wstring image_;
+    bool tried_animated_;
+    bool animated_complete_;
     IRandomAccessStreamReference image_raw_;
     wstring spotify_link_;
     wstring amlink_;
@@ -92,6 +96,7 @@ private:
     SpotifyApi *spotify_client_;
     ImgurApi *imgur_client_;
     Amscraper *scraper_;
+    M3U8Processor *processor_;
     spdlog::logger *logger_;
     Lfm *lastfm_client_;
 
@@ -99,6 +104,7 @@ private:
     atomic<int> nowplayingattempts_ = 0;
     atomic<bool> scrobbled_ = false;
     atomic<bool> set_now_playing_ = false;
+    int cycle_num_ = 0;
 
     Windows::Media::Control::GlobalSystemMediaTransportControlsSession session_ = nullptr;
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager smtcsm_ = nullptr;
