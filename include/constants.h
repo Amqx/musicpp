@@ -5,10 +5,16 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define IDI_APPICON 101 // image
+#define DISCORDPP_IMPLEMENTATION
+
+#ifndef RC_INVOKED
+#include <vector>
 #include <string>
 #include <chrono>
+#include <limits>
 
-const std::wstring kVersion = L"1.1.3";
+const std::wstring kVersion = L"1.1.4"; // Animated image patch
 
 // Searches and Matching
 constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
@@ -27,7 +33,6 @@ constexpr int kMaxFiles = 10; // Max number of log files at one time
 
 // Main loop
 constexpr int kLoopRefreshInterval = 5000; // How many milliseconds between each metadata/ discord refresh
-#define IDI_APPICON 101 // image
 constexpr int kTrayMaxStrLen = 25;
 // Max length of any string on the tray tool tip, DO NOT SET IT UNDER 10 OR YOU WILL HAVE TO CHANGE stringutils.cpp:Truncate(const wstring& input)!
 
@@ -66,11 +71,10 @@ constexpr double kLfmPercentage = 0.75; // Min percentage for a song to be scrob
 constexpr int kLfmElapsedTime = 240; // Min time before a song is force scrobbled
 
 // Apple Music Web Scraper
-const std::string kTargetSize = "800x800bb-60";
+const std::string kTargetSize = "1000x1000bb-60";
 // Apple Music scraping target image size - I recommend keeping it at this
 
 // Discord
-#define DISCORDPP_IMPLEMENTATION
 constexpr uint64_t kDiscordApikey = 1358389458956976128; // Discord application api key
 constexpr int kDiscordMaxStrLen = 128; // The max length of a string in a Discord activity is 128 - do not change!
 constexpr std::chrono::milliseconds kDiscordRefreshInterval(10); // Recommended Discord value
@@ -87,13 +91,24 @@ const std::wstring kLastFmDbApikey = L"musicpp/lastfm_api_key";
 const std::wstring kLastFmDbSecret = L"musicpp/lastfm_secret";
 const std::wstring kLastFmDbSessionKey = L"musicpp/lastfm_sessionkey";
 
+// Animated image constants
+constexpr int kGifMinCyclesBeforeProcess = 2;
+// How many cycles should be waited before a gif is allowed to process. Default is 2 cycles (10 seconds). I don't recommend this go lower
+constexpr int kGifFPS = 24;
+constexpr int64_t kGifMaxTotalFrames = 10 * kGifFPS; // 10 seconds of frames
+constexpr int64_t kGifMinFramesBeforeMatch = 2 * kGifFPS;
+// At least 2 seconds have passed before allowing a matched frame
+constexpr double kGifMatchThreshold = 1.0; // How strict loop detection should be. 1.0 means it has to be 100% match
+
 // Others
-constexpr uint64_t kWindowsTsConversion = 10'000'000;
+constexpr uint64_t kWindowsTsConversion = 10000000;
 // Windows gives us the current timestamp as nanoseconds, this converts to seconds
 constexpr int kDbExpireTime = 7 * 24 * 60 * 60; // images/ links automatically expire in a week
+constexpr int kDbExpireTimeAnim = kDbExpireTime * 2;
+// Animated images last for twice the amount of time as a normal image
 constexpr uint64_t kInvalidTime = std::numeric_limits<uint64_t>::max();
 constexpr int kSnapshotTypeDiscord = 1;
 constexpr int kSnapshotTypeTray = 2;
 constexpr int kSnapshotTypeTime = 3;
-
+#endif
 #endif

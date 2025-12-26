@@ -14,9 +14,11 @@
 #include "timeutils.h"
 #include "stringutils.h"
 
-MediaPlayer::MediaPlayer(Amscraper *scraper, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm, leveldb::DB *database,
+MediaPlayer::MediaPlayer(Amscraper *scraper, M3U8Processor *processor, SpotifyApi *sapi, ImgurApi *iapi, Lfm *lastfm,
+                         leveldb::DB *database,
                          spdlog::logger *logger) {
     this->scraper_ = scraper;
+    this->processor_ = processor;
     this->spotify_client_ = sapi;
     this->imgur_client_ = iapi;
     this->db_ = database;
@@ -149,6 +151,7 @@ void MediaPlayer::UpdateInfo() {
     wstring old_album = album_;
     wstring old_artist = artist_;
 
+    // ReSharper disable once CppDFAUnusedValue
     Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties properties{nullptr};
 
     try {
@@ -189,6 +192,39 @@ void MediaPlayer::UpdateInfo() {
                 }
             }).detach();
         }
+        if (cycle_num_ >= kGifMinCyclesBeforeProcess && !tried_animated_ && !amlink_.empty()) {
+            tried_animated_ = true;
+            processor_->start();
+            processor_->Submit(ConvertWString(amlink_));
+        } else if (tried_animated_) {
+            if (!animated_complete_) {
+                if (const auto status = processor_->Status(); status == Finished || status == Failed) {
+                    animated_complete_ = true;
+                    if (status == Finished) {
+                        const auto gif = processor_->Get();
+                        if (gif.empty()) return;
+
+                        const auto url = imgur_client_->UploadImage(gif);
+                        if (!url.empty()) {
+                            this->image_ = ConvertToWString(url);
+
+                            const string url_key =
+                                    "musicppAMAnim" + SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' +
+                                    SanitizeKeys(salbum);
+                            const string value = to_string(UnixSecondsNow()) + "|" + url + "|Apple Music (Anim)";
+                            // gifs get twice the expiry time
+                            if (db_) {
+                                db_->Put(leveldb::WriteOptions(), url_key, value);
+                            }
+                        }
+                    } else {
+                        if (logger_) logger_->info("M3U8 processor unsuccessful");
+                    }
+                    processor_->exit();
+                }
+            }
+        }
+        cycle_num_++;
         return;
     }
 
@@ -203,6 +239,8 @@ void MediaPlayer::UpdateInfo() {
                           ConvertWString(this->album_));
 
         this->image_.clear();
+        this->tried_animated_ = false;
+        this->animated_complete_ = false;
         this->image_raw_ = properties.Thumbnail();
         this->image_source_.clear();
         this->amlink_.clear();
@@ -212,6 +250,9 @@ void MediaPlayer::UpdateInfo() {
         this->scrobbled_ = false;
         this->scrobbleattempts_ = 0;
         this->nowplayingattempts_ = 0;
+        this->cycle_num_ = 0;
+        this->processor_->exit();
+
         const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
 
         if (!set_now_playing_ && playing_) {
@@ -269,16 +310,26 @@ void MediaPlayer::ImageRefresh() {
         this->amlink_.clear();
         this->spotify_link_.clear();
         this->lastfmlink_.clear();
+        this->tried_animated_ = false;
+        this->animated_complete_ = false;
 
-        db_->Delete(leveldb::WriteOptions(), song_key);
-        db_->Delete(leveldb::WriteOptions(), "musicppAM" + song_key);
-        db_->Delete(leveldb::WriteOptions(), "musicppLFM" + song_key);
-        db_->Delete(leveldb::WriteOptions(), "musicppSP" + song_key);
+        if (db_) {
+            db_->Delete(leveldb::WriteOptions(), song_key);
+            db_->Delete(leveldb::WriteOptions(), "musicppAMAnim" + song_key);
+            db_->Delete(leveldb::WriteOptions(), "musicppAM" + song_key);
+            db_->Delete(leveldb::WriteOptions(), "musicppLFM" + song_key);
+            db_->Delete(leveldb::WriteOptions(), "musicppSP" + song_key);
+        }
 
         FetchArtworkAm(curr_time, song_key, stitle, sartist, salbum, log);
         FetchLastFmLink(curr_time, song_key, stitle, sartist, log);
         FetchArtworkSpotify(curr_time, song_key, stitle, sartist, salbum, log);
         FetchArtworkImgur(curr_time, song_key, image_raw_, log);
+        if (cycle_num_ >= kGifMinCyclesBeforeProcess && !amlink_.empty()) {
+            tried_animated_ = true;
+            processor_->start();
+            processor_->Submit(ConvertWString(amlink_));
+        }
     } catch (exception &e) {
         if (logger_) logger_->error("Unknown error occured: {}", e.what());
     }
@@ -324,6 +375,8 @@ void MediaPlayer::reset() {
     this->artist_ = L"";
     this->album_ = L"";
     this->image_ = L"";
+    this->tried_animated_ = false;
+    this->animated_complete_ = false;
     this->image_source_ = L"";
     this->spotify_link_ = L"";
     this->amlink_ = L"";
@@ -337,6 +390,8 @@ void MediaPlayer::reset() {
     this->set_now_playing_ = false;
     this->scrobbleattempts_ = 0;
     this->nowplayingattempts_ = 0;
+    cycle_num_ = 0;
+    this->processor_->exit();
 }
 
 void MediaPlayer::FindRunning() {
@@ -422,7 +477,11 @@ bool MediaPlayer::UpdateMetadata(
 
 void MediaPlayer::LoadDbImage(const uint64_t &curr_time, const string &song_key, ArtworkLog &log) {
     string result;
-    if (const auto status = db_->Get(leveldb::ReadOptions(), song_key, &result); !status.ok()) return;
+    bool anim = true;
+    if (const auto status = db_->Get(leveldb::ReadOptions(), "musicppAMAnim" + song_key, &result); !status.ok()) {
+        anim = false;
+        if (const auto status2 = db_->Get(leveldb::ReadOptions(), song_key, &result); !status2.ok()) return;
+    }
 
     log.db_hit_image = true;
     try {
@@ -442,14 +501,27 @@ void MediaPlayer::LoadDbImage(const uint64_t &curr_time, const string &song_key,
             source = result.substr(second_sep + 1);
         }
 
-        if (curr_time - timestamp > kDbExpireTime) {
-            db_->Delete(leveldb::WriteOptions(), song_key);
-            log.db_image_expired = true;
-            image_source_ = L"DB - expired";
-            return;
+        if (anim) {
+            if (curr_time - timestamp > kDbExpireTimeAnim) {
+                db_->Delete(leveldb::WriteOptions(), "musicppAMAnim" + song_key);
+                log.db_image_expired = true;
+                image_source_ = L"DB - expired";
+                return;
+            }
+        } else {
+            if (curr_time - timestamp > kDbExpireTime) {
+                db_->Delete(leveldb::WriteOptions(), song_key);
+                log.db_image_expired = true;
+                image_source_ = L"DB - expired";
+                return;
+            }
         }
 
         image_ = ConvertToWString(url);
+        if (anim) {
+            this->animated_complete_ = true;
+            this->tried_animated_ = true;
+        }
         if (source.empty()) {
             image_source_ = L"DB - unknown";
         } else {
@@ -460,7 +532,11 @@ void MediaPlayer::LoadDbImage(const uint64_t &curr_time, const string &song_key,
         if (this->logger_) {
             this->logger_->warn("DB Image Parse Error for '{}': {}", song_key, e.what());
         }
-        db_->Delete(leveldb::WriteOptions(), song_key);
+        if (anim) {
+            db_->Delete(leveldb::WriteOptions(), "musicppAMAnim" + song_key);
+        } else {
+            db_->Delete(leveldb::WriteOptions(), song_key);
+        }
         log.db_parse_error = true;
         this->image_.clear();
         this->image_source_.clear();

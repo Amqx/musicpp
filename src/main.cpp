@@ -3,6 +3,7 @@
 //
 
 #include "lfm.h"
+#include "m3u8.h"
 #include "consoleutils.h"
 #include "constants.h"
 #include "credhelper.h"
@@ -38,6 +39,8 @@ namespace {
         std::shared_ptr<spdlog::logger> logger;
 
         std::unique_ptr<Amscraper> scraper;
+
+        std::unique_ptr<M3U8Processor> processor;
 
         std::unique_ptr<Lfm> lastfm;
 
@@ -225,7 +228,8 @@ namespace {
 
     void CleanDatabase(const AppContext &ctx) {
         if (ctx.logger) ctx.logger->info("Beginning database purge: checking for keys older than {}s", kDbExpireTime);
-        wcout << L"Cleaning database of keys older than " << kDbExpireTime << "s" << endl;
+        wcout << L"Cleaning database of static images older than " << kDbExpireTime << "s" << endl;
+        wcout << L"Cleaning database of animated images older than " << kDbExpireTimeAnim << "s" << endl;
         const uint64_t now = UnixSecondsNow();
 
         leveldb::ReadOptions ro;
@@ -271,6 +275,10 @@ namespace {
                     if (stored > now) {
                         should_delete = true;
                         malformed++;
+                    } else if (key.ToString().find("musicppAMAnim") != string::npos) {
+                        if (now - stored > kDbExpireTimeAnim) {
+                            should_delete = true;
+                        }
                     } else if (now - stored > kDbExpireTime) {
                         should_delete = true;
                     }
@@ -356,6 +364,7 @@ namespace {
             logger->flush_on(spdlog::level::debug);
 #endif
             spdlog::set_pattern("(%Y-%m-%d %H:%M:%S %z, [%8l]) Thread %t: %v");
+            spdlog::set_default_logger(logger);
             ctx.logger = logger;
         }
 
@@ -489,6 +498,9 @@ namespace {
         ctx.scraper = std::make_unique<Amscraper>(region, ctx.logger.get());
         if (ctx.logger) ctx.logger->info("AMScraper initialized with region {}", region);
 
+        ctx.processor = std::make_unique<M3U8Processor>(ctx.logger.get());
+        if (ctx.logger) ctx.logger->info("M3U8Processor initialized");
+
         ctx.lastfm = std::make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.db.get(),
                                            ctx.logger.get());
         if (ctx.logger) {
@@ -503,7 +515,8 @@ namespace {
         ctx.imgur = std::make_unique<ImgurApi>(ConvertWString(i_cid), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("ImgurAPI initialized");
 
-        ctx.player = std::make_unique<MediaPlayer>(ctx.scraper.get(), ctx.spotify.get(), ctx.imgur.get(),
+        ctx.player = std::make_unique<MediaPlayer>(ctx.scraper.get(), ctx.processor.get(), ctx.spotify.get(),
+                                                   ctx.imgur.get(),
                                                    ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
         if (ctx.logger) ctx.logger->info("mediaPlayer initialized");
 
