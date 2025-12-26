@@ -60,6 +60,7 @@ Snapshot MediaPlayer::GetSnapshot(const int type) const {
         if (!image_.empty()) info.image = image_;
         else info.image = kDefaultImage;
 
+        info.image_source = image_source_;
         info.amlink = amlink_;
         info.lfmlink = lastfmlink_;
         info.splink = spotify_link_;

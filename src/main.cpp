@@ -227,9 +227,11 @@ namespace {
     }
 
     void CleanDatabase(const AppContext &ctx) {
-        if (ctx.logger) ctx.logger->info("Beginning database purge: checking for keys older than {}s", kDbExpireTime);
-        wcout << L"Cleaning database of static images older than " << kDbExpireTime << "s" << endl;
-        wcout << L"Cleaning database of animated images older than " << kDbExpireTimeAnim << "s" << endl;
+        if (ctx.logger) ctx.logger->info(
+            "Beginning database purge: checking for keys older than {}s (static) and keys older than {}s (animated)",
+            kDbExpireTime, kDbExpireTimeAnim);
+        wcout << L"Cleaning database of static images older than " << FriendlyTime(kDbExpireTime) << endl;
+        wcout << L"Cleaning database of animated images older than " << FriendlyTime(kDbExpireTimeAnim) << endl;
         const uint64_t now = UnixSecondsNow();
 
         leveldb::ReadOptions ro;
@@ -364,6 +366,7 @@ namespace {
             logger->flush_on(spdlog::level::debug);
 #endif
             spdlog::set_pattern("(%Y-%m-%d %H:%M:%S %z, [%8l]) Thread %t: %v");
+            // ReSharper disable once CppRedundantQualifierADL
             spdlog::set_default_logger(logger);
             ctx.logger = logger;
         }
@@ -538,8 +541,14 @@ namespace {
         if (metadata.album.empty()) {
             tip_stream << L"MusicPP\nNo track playing";
         } else {
-            tip_stream << L"MusicPP\nPresence Active\n\n";
-            tip_stream << L"Image Source: " << (!image_source.empty() ? image_source : L"unknown") << L"\n";
+            tip_stream << L"MusicPP\n";
+            if (ctx->discord->GetState()) {
+                tip_stream << L"Presence enabled\n";
+            }
+            if (ctx->lastfm->GetState()) {
+                tip_stream << L"LastFM enabled\n";
+            }
+            tip_stream << L"\nImage Source: " << (!image_source.empty() ? image_source : L"unknown") << L"\n";
 
             if (playing) {
                 if (const uint64_t duration = metadata.duration; duration > 0) {
@@ -569,7 +578,7 @@ namespace {
         Shell_NotifyIcon(NIM_MODIFY, &ctx->nid);
     }
 
-    void CopyToClipboard(const AppContext *ctx, const std::wstring &text) {
+    void CopyToClipboard(const AppContext *ctx, const std::wstring &text, const wstring& label) {
         if (!OpenClipboard(nullptr)) {
             if (ctx->logger) ctx->logger->error("Failed to open clipboard for text: {}", ConvertWString(text));
             return;
@@ -589,8 +598,18 @@ namespace {
         memcpy(GlobalLock(hMem), text.c_str(), bytes);
         GlobalUnlock(hMem);
         SetClipboardData(CF_UNICODETEXT, hMem);
-        if (ctx->logger) ctx->logger->debug("Set clipboard to: {}", ConvertWString(text));
         CloseClipboard();
+
+        NOTIFYICONDATAW tempNid = {sizeof(tempNid)};
+        tempNid.hWnd = ctx->hWnd;
+        tempNid.uID = 1; // This must match the ID used in WM_CREATE (ctx->nid.uID)
+        tempNid.uFlags = NIF_INFO;
+        tempNid.dwInfoFlags = NIIF_INFO;
+        lstrcpynW(tempNid.szInfoTitle, L"Copied to clipboard", ARRAYSIZE(tempNid.szInfoTitle));
+        lstrcpynW(tempNid.szInfo, label.c_str(), ARRAYSIZE(tempNid.szInfo));
+
+        Shell_NotifyIcon(NIM_MODIFY, &tempNid);
+        if (ctx->logger) ctx->logger->debug("Set clipboard to: {}", ConvertWString(text));
     }
 
     LRESULT CALLBACK WndProc(const HWND hWnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
@@ -745,25 +764,26 @@ namespace {
 
                     case ID_COPY_TITLE: {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
-                        CopyToClipboard(ctx, metadata.title);
+                        CopyToClipboard(ctx, metadata.title, L"Copied title: " + metadata.title);
                         return 0;
                     }
 
                     case ID_COPY_ARTIST: {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
-                        CopyToClipboard(ctx, metadata.artist);
+                        CopyToClipboard(ctx, metadata.artist, L"Copied artist: " + metadata.artist);
                         return 0;
                     }
 
                     case ID_COPY_ALBUM: {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
-                        CopyToClipboard(ctx, metadata.album);
+                        CopyToClipboard(ctx, metadata.album, L"Copied album: " + metadata.album);
                         return 0;
                     }
 
                     case ID_COPY_IMAGE: {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
-                        CopyToClipboard(ctx, metadata.image);
+                        CopyToClipboard(ctx, metadata.image,
+                                        L"Copied image URL\nSourced from: " + metadata.image_source);
                         return 0;
                     }
 
@@ -774,7 +794,11 @@ namespace {
 
                     case ID_COPY_TITLE_ARTIST_ALBUM: {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
-                        CopyToClipboard(ctx, metadata.title + L"\r\n" + metadata.artist + L"\r\n" + metadata.album);
+                        const wstring clipboard_text =
+                                metadata.title + L"\r\n" + metadata.artist + L"\r\n" + metadata.album;
+                        const wstring label = L"Copied metadata\nTitle: " + metadata.title + L"\nArtist: " + metadata.
+                                              artist + L"\nAlbum: " + metadata.album;
+                        CopyToClipboard(ctx, clipboard_text, label);
                         return 0;
                     }
 
