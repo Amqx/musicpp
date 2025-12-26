@@ -224,7 +224,7 @@ bool SpotifyApi::RequestToken() {
             const auto timestamp = stoi(spotify_client_token.substr(split + 1));
 
             if (const auto curr_time = UnixSecondsNow();
-                curr_time - timestamp < kSpotifyTokenValidity) {
+                curr_time - timestamp < kSpotifyRefreshInterval) {
                 access_token_ = ConvertWString(spotify_client_token.substr(0, split));
                 last_refresh_time_ = timestamp;
                 if (logger_) {
