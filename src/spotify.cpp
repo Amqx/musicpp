@@ -229,7 +229,7 @@ bool SpotifyApi::RequestToken() {
                 last_refresh_time_ = timestamp;
                 if (logger_) {
                     logger_->info("Loaded previous Spotify token, valid for {} seconds",
-                                  curr_time - last_refresh_time_);
+                                  kSpotifyTokenValidity - (curr_time - last_refresh_time_));
                 }
                 return true;
             }
@@ -307,7 +307,7 @@ void SpotifyApi::RefreshLoop() {
 
         std::unique_lock lock(cv_mutex_);
 
-        if (cv_.wait_for(lock, hours(wait), [this] { return !running_.load(); })) {
+        if (cv_.wait_for(lock, seconds(wait), [this] { return !running_.load(); })) {
             return;
         }
 
