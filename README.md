@@ -9,8 +9,10 @@ Discord Rich Presence for the Windows Apple Music desktop app written in C++/Win
 
 - Rich presence with track title, artist, album, progress bar, and pause state
 - Album art with Apple Music first, then Spotify, then Imgur as fallbacks (cached in LevelDB)
+- Animated album art (Apple Music motion -> GIF) when available
 - Optional Last.fm now playing + scrobbling
-- Tray icon allowing copy of metadata and toggling Discord Rich Presence/ Last.FM features
+- Tray icon with metadata copy, copy all, force image refresh, and toggles for Discord Rich Presence/Last.fm (with toast
+  notifications)
 - Presence buttons for Apple Music plus Last.fm or Spotify links (when available)
 - Low resource usage (~5–10MB RAM, ~0.1% CPU, ~20MB disk with deps)
 
@@ -61,7 +63,7 @@ The simplest path is CLion with VCPKG integration.
    CMake Profiles).
 4. Install dependencies:
    ```powershell
-   ~/.vcpkg-clion/vcpkg/vcpkg.exe install curl leveldb cppwinrt nlohmann-json spdlog libxml2
+   ~/.vcpkg-clion/vcpkg/vcpkg.exe install curl leveldb cppwinrt nlohmann-json spdlog libxml2 ffmpeg pkgconf
    ```
 5. Install the Discord Social SDK into `discordsdk/` (see next section).
 6. Build and run from CLion (Shift + F10).
@@ -80,7 +82,7 @@ The simplest path is CLion with VCPKG integration.
    ```
 3. Install dependencies (VCPKG is easiest):
    ```powershell
-   vcpkg install curl leveldb cppwinrt nlohmann-json spdlog libxml2
+   vcpkg install curl leveldb cppwinrt nlohmann-json spdlog libxml2 ffmpeg pkgconf
    ```
 4. Install the Discord Social SDK into `discordsdk/` (see next section).
 5. Configure and build:
