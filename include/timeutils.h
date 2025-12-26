@@ -9,6 +9,8 @@
 
 std::wstring FormatTimestamp(const uint64_t &seconds);
 
+std::wstring FriendlyTime(const uint64_t &seconds);
+
 uint64_t UnixSecondsNow();
 
 #endif //MUSICPP_TIMEUTILS_H
