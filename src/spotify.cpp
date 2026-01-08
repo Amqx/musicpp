@@ -303,11 +303,22 @@ void SpotifyApi::RefreshLoop() {
     while (running_) {
         const uint64_t now = UnixSecondsNow();
         const uint64_t next_refresh = last_refresh_time_ + kSpotifyRefreshInterval;
-        uint64_t wait = next_refresh > now ? next_refresh - now : 0;
+
+        if (now >= next_refresh) {
+            if (logger_) {
+                logger_->info("Spotify token refresh overdue by {} seconds after sleep",
+                              now - next_refresh);
+            }
+            if (!RequestToken()) {
+                if (logger_) logger_->warn("Failed to refresh Spotify token.");
+            }
+            continue;
+        }
 
         std::unique_lock lock(cv_mutex_);
+        const auto wake_time = system_clock::time_point{seconds(next_refresh)};
 
-        if (cv_.wait_for(lock, seconds(wait), [this] { return !running_.load(); })) {
+        if (cv_.wait_until(lock, wake_time, [this] { return !running_.load(); })) {
             return;
         }
 
