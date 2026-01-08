@@ -148,6 +148,19 @@ void MediaPlayer::UpdateInfo() {
         return;
     }
 
+    if (!playing_ && pause_time_ != kInvalidTime) {
+        const auto paused_for = UnixSecondsNow() - pause_time_;
+        if (paused_for >= kLfmNowPlayingPauseResetSeconds) {
+            if (set_now_playing_ || nowplayingattempts_ > 0) {
+                set_now_playing_ = false;
+                nowplayingattempts_ = 0;
+                if (logger_) {
+                    logger_->debug("Reset LastFM now playing state after {}s paused", paused_for);
+                }
+            }
+        }
+    }
+
     wstring old_title = title_;
     wstring old_album = album_;
     wstring old_artist = artist_;
@@ -178,16 +191,32 @@ void MediaPlayer::UpdateInfo() {
     const auto duration = total_time_;
 
     if (!(old_title != title_ || old_album != album_ || old_artist != artist_)) {
+        if (!set_now_playing_ && playing_ && cycle_num_ >= kLfmNowPlayingMinCycles) {
+            this->set_now_playing_ = true;
+            thread([this, stitle, sartist, salbum, duration] {
+                if (nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
+                    const bool ok = lastfm_client_->UpdateNowPlaying(stitle, sartist, salbum, duration);
+                    nowplayingattempts_ += 1;
+                    if (!ok && nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
+                        this->set_now_playing_ = false;
+                    }
+                } else {
+                    this->set_now_playing_ = true;
+                }
+            }).detach();
+        }
         if (const auto elapsed_time = GetElapsedSeconds();
             !scrobbled_ && total_time_ > kLfmMinTime && ((
                 static_cast<double>(elapsed_time) / static_cast<double>(this->total_time_) >=
                 kLfmPercentage || elapsed_time > kLfmElapsedTime))) {
+            this->scrobbled_ = true;
             std::thread([this, stitle, sartist, salbum, start_time] {
                 if (scrobbleattempts_ < kMaxScrobbleAttempts) {
-                    if (lastfm_client_->scrobble(stitle, sartist, salbum, start_time)) {
-                        this->scrobbled_ = true;
-                    };
+                    const bool ok = lastfm_client_->scrobble(stitle, sartist, salbum, start_time);
                     scrobbleattempts_ += 1;
+                    if (!ok && scrobbleattempts_ < kMaxScrobbleAttempts) {
+                        this->scrobbled_ = false;
+                    }
                 } else {
                     this->scrobbled_ = true;
                 }
@@ -255,19 +284,6 @@ void MediaPlayer::UpdateInfo() {
         this->processor_->exit();
 
         const string song_key = SanitizeKeys(stitle) + '|' + SanitizeKeys(sartist) + '|' + SanitizeKeys(salbum);
-
-        if (!set_now_playing_ && playing_) {
-            thread([this, stitle, sartist, salbum, duration] {
-                if (nowplayingattempts_ < kMaxSetNowPlayingAttempts) {
-                    if (lastfm_client_->UpdateNowPlaying(stitle, sartist, salbum, duration)) {
-                        this->set_now_playing_ = true;
-                    };
-                    nowplayingattempts_ += 1;
-                } else {
-                    this->set_now_playing_ = true;
-                }
-            }).detach();
-        }
 
         if (db_) {
             LoadDbImage(curr_time, song_key, log);
