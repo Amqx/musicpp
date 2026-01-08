@@ -69,6 +69,8 @@ constexpr int kMaxSetNowPlayingAttempts = 3; // Max tries to set last.fm's now p
 constexpr int kLfmMinTime = 30; // Min time for a song to be considered for scrobbling
 constexpr double kLfmPercentage = 0.75; // Min percentage for a song to be scrobbled
 constexpr int kLfmElapsedTime = 240; // Min time before a song is force scrobbled
+constexpr int kLfmNowPlayingMinCycles = 2; // Min cycles before setting LastFM now playing
+constexpr int kLfmNowPlayingPauseResetSeconds = 600; // Min paused time before resetting now playing state
 
 // Apple Music Web Scraper
 const std::string kTargetSize = "1000x1000bb-60";
