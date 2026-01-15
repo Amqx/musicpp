@@ -97,7 +97,7 @@ const std::wstring kLastFmDbSessionKey = L"musicpp/lastfm_sessionkey";
 constexpr int kGifMinCyclesBeforeProcess = 2;
 // How many cycles should be waited before a gif is allowed to process. Default is 2 cycles (10 seconds). I don't recommend this go lower
 constexpr int kGifFPS = 24;
-constexpr int64_t kGifMaxTotalFrames = 10 * kGifFPS; // 10 seconds of frames
+constexpr int64_t kGifMaxTotalFrames = 5 * kGifFPS; // 5 seconds of frames. When a gif is 10 seconds, Discord refuses to load it even when the gif exists. This value may change after more testing.
 constexpr int64_t kGifMinFramesBeforeMatch = 2 * kGifFPS;
 // At least 2 seconds have passed before allowing a matched frame
 constexpr double kGifMatchThreshold = 1.0; // How strict loop detection should be. 1.0 means it has to be 100% match
