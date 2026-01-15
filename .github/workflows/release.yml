@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Checkout Main
-        uses: actions/checkout@v4.1.1
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
         with:
           fetch-depth: 0
 
@@ -29,6 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.SDK_ACCESS_TOKEN }}
         run: |
+          Set-Location $env:GITHUB_WORKSPACE
           $LATEST_TAG = gh release view --repo Amqx/discord-social-sdk --json tagName -q '.tagName'
           Write-Host "Latest release tag: $LATEST_TAG"
           gh release download --repo Amqx/discord-social-sdk "$LATEST_TAG" --pattern "*.zip" --dir discordsdk_tmp
@@ -38,7 +39,7 @@ jobs:
           Remove-Item discordsdk_tmp -Recurse -Force
 
       - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
 
       - name: Install Dependencies
         shell: pwsh
@@ -57,11 +58,11 @@ jobs:
       - name: Configure and build
         shell: pwsh
         run: |
-          cmake -S . -B build -G Ninja `
+          cmake -S "$env:GITHUB_WORKSPACE" -B "$env:GITHUB_WORKSPACE/build" -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
             -DVCPKG_TARGET_TRIPLET=x64-windows
-          cmake --build build
+          cmake --build "$env:GITHUB_WORKSPACE/build"
 
       - name: Package ZIP
         shell: pwsh
@@ -72,38 +73,44 @@ jobs:
           
           if ($TAG -eq "main") { $TAG = "build-${{ github.run_number }}" }
           
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $distPath = Join-Path $env:GITHUB_WORKSPACE "dist"
+          New-Item -ItemType Directory -Force -Path $distPath | Out-Null
           
-          $exe = Get-ChildItem build -Recurse -Filter musicpp.exe | Select-Object -First 1
-          Copy-Item $exe.FullName dist/
+          $exe = Get-ChildItem "$env:GITHUB_WORKSPACE/build" -Recurse -Filter musicpp.exe | Select-Object -First 1
+          Copy-Item $exe.FullName $distPath/
           
-          Get-ChildItem build -Recurse -Filter *.dll | ForEach-Object {
-            Copy-Item $_.FullName dist/ -Force
+          Get-ChildItem "$env:GITHUB_WORKSPACE/build" -Recurse -Filter *.dll | ForEach-Object {
+            Copy-Item $_.FullName $distPath/ -Force
           }
           
           $ZipName = "musicpp-$TAG-windows.zip"
-          Compress-Archive -Path dist/* -DestinationPath $ZipName
+          $ZipPath = Join-Path $env:GITHUB_WORKSPACE $ZipName
+          Compress-Archive -Path "$distPath/*" -DestinationPath $ZipPath
           
           echo "ZIP_NAME=$ZipName" >> $env:GITHUB_ENV
           echo "RELEASE_TAG=$TAG" >> $env:GITHUB_ENV
+          echo "DIST_PATH=$distPath" >> $env:GITHUB_ENV
 
       - name: Build Installer
         shell: pwsh
         run: |
           $ISCC = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          New-Item -ItemType Directory -Force -Path installer_out | Out-Null
+          if (-not (Test-Path $ISCC)) { $ISCC = "ISCC.exe" } # Fallback to PATH
           
-          & $ISCC "installer\installer.iss" `
+          $outPath = Join-Path $env:GITHUB_WORKSPACE "installer_out"
+          New-Item -ItemType Directory -Force -Path $outPath | Out-Null
+          
+          & $ISCC "$env:GITHUB_WORKSPACE/installer/installer.iss" `
             "/DVersion=${{ env.RELEASE_TAG }}" `
-            "/DSourceDir=$(Resolve-Path dist)" `
-            "/DOutputDir=$(Resolve-Path installer_out)" `
+            "/DSourceDir=${{ env.DIST_PATH }}" `
+            "/DOutputDir=$outPath" `
             "/DOutputBaseFilename=musicpp-${{ env.RELEASE_TAG }}-setup"
           
-          $installerExe = Get-ChildItem installer_out -Filter *.exe | Select-Object -First 1
+          $installerExe = Get-ChildItem $outPath -Filter *.exe | Select-Object -First 1
           echo "INSTALLER_EXE=$($installerExe.FullName)" >> $env:GITHUB_ENV
 
       - name: Upload to Releases
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
         with:
           files: |
             ${{ env.ZIP_NAME }}
