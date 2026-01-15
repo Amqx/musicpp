@@ -45,8 +45,7 @@ WizardStyle=modern
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; 
-GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\{#ExeName}"; DestDir: "{app}"; Flags: ignoreversion
