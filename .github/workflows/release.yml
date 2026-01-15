@@ -19,7 +19,7 @@ jobs:
       contents: write
     env:
       VCPKG_ROOT: C:\vcpkg
-      VCPKG_TARGET_TRIPLET: x64-windows
+      VCPKG_TARGET_TRIPLET: x64-windows-release
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_binary_cache
       VCPKG_FEATURE_FLAGS: binarycaching
 
@@ -68,8 +68,9 @@ jobs:
           cmake -S "$env:GITHUB_WORKSPACE" -B "$env:GITHUB_WORKSPACE/build" -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-release `
             -DVCPKG_BUILD_TYPE=release
+            -DUSE_STATIC_LINKING=OFF
           cmake --build "$env:GITHUB_WORKSPACE/build"
 
       - name: Package ZIP
