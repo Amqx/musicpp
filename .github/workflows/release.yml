@@ -48,6 +48,7 @@ jobs:
             choco install -y pkgconfiglite ninja innosetup
           }
           $vcpkgJob = Start-Job -ScriptBlock {
+            $env:VCPKG_ROOT = "C:\vcpkg"
             vcpkg install ffmpeg:x64-windows curl:x64-windows cppwinrt:x64-windows leveldb:x64-windows spdlog:x64-windows libxml2:x64-windows nlohmann-json:x64-windows
           }
           
