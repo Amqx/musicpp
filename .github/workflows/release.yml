@@ -70,7 +70,6 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
             -DVCPKG_TARGET_TRIPLET=x64-windows-release `
             -DVCPKG_BUILD_TYPE=release
-            -DUSE_STATIC_LINKING=OFF
           cmake --build "$env:GITHUB_WORKSPACE/build"
 
       - name: Package ZIP
