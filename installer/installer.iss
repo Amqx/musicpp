@@ -29,6 +29,7 @@
 AppId={{E01FBADD-C493-4950-8BDF-1095A962FCC9}}
 AppName={#Name}
 AppVersion={#Version}
+OutputDir={#OutputDir}
 OutputBaseFilename={#OutputBaseFilename}
 DefaultDirName={autopf}\{#Name}
 UninstallDisplayIcon={app}\{#ExeName}
