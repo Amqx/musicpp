@@ -124,6 +124,7 @@ jobs:
           if (-not $installerExe) { throw "Installer EXE not found in $outPath" }
           
           $relPath = $installerExe.FullName.Substring($env:GITHUB_WORKSPACE.Length + 1)
+          $relPath = $relPath -replace '\\','/'
 
           "INSTALLER_EXE=$relPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
