@@ -17,6 +17,12 @@ jobs:
     permissions:
       actions: write
       contents: write
+    env:
+      VCPKG_ROOT: C:\vcpkg
+      VCPKG_TARGET_TRIPLET: x64-windows
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_binary_cache
+      VCPKG_FEATURE_FLAGS: binarycaching
+      VCPKG_BUILD_TYPE: release
 
     steps:
       - name: Checkout Main
@@ -41,20 +47,31 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
 
-      - name: Install Dependencies
+      - name: Prepare vcpkg cache dirs
         shell: pwsh
         run: |
-          $chocoJob = Start-Job -ScriptBlock { 
-            choco install -y pkgconfiglite ninja innosetup
+          New-Item -ItemType Directory -Force -Path "${{ env.VCPKG_DEFAULT_BINARY_CACHE }}" | Out-Null
+
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+            ${{ env.VCPKG_ROOT }}\downloads
+          key: vcpkg-${{ runner.os }}-${{ env.VCPKG_TARGET_TRIPLET }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ env.VCPKG_TARGET_TRIPLET }}-
+            vcpkg-${{ runner.os }}-
+
+      - name: Start keep-alive
+        shell: pwsh
+        run: |
+          Start-Job -ScriptBlock {
+            while ($true) {
+              Write-Host "Build still running..."
+              Start-Sleep -Seconds 240
+            }
           }
-          $vcpkgJob = Start-Job -ScriptBlock {
-            $env:VCPKG_ROOT = "C:\vcpkg"
-            vcpkg install ffmpeg:x64-windows curl:x64-windows cppwinrt:x64-windows leveldb:x64-windows spdlog:x64-windows libxml2:x64-windows nlohmann-json:x64-windows
-          }
-          
-          Wait-Job $chocoJob, $vcpkgJob
-          Receive-Job $chocoJob
-          Receive-Job $vcpkgJob
 
       - name: Configure and build
         shell: pwsh
