@@ -20,6 +20,7 @@ jobs:
     env:
       VCPKG_TARGET_TRIPLET: x64-windows-release
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_FEATURE_FLAGS: dependencygraph
 
     steps:
       - name: Checkout Main
@@ -58,7 +59,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT\scripts\buildsystems\vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=${{ env.VCPKG_TARGET_TRIPLET }} `
-            -DVCPKG_BUILD_TYPE=release
           cmake --build "$env:GITHUB_WORKSPACE/build"
 
       - name: Package ZIP
@@ -103,8 +103,13 @@ jobs:
             "/DOutputDir=$outPath" `
             "/DOutputBaseFilename=musicpp-${{ env.RELEASE_TAG }}-setup"
           
-          $installerPath = $installerExe.FullName -replace '\\', '/'
-          echo "INSTALLER_EXE=$installerPath" >> $env:GITHUB_ENV
+          $installerExe = Get-ChildItem -Path $outPath -Filter "*.exe" -File |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          
+          $relPath = $installerExe.FullName.Substring($env:GITHUB_WORKSPACE.Length + 1)
+
+          "INSTALLER_EXE=$relPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload to Releases
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2
