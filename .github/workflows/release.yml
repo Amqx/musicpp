@@ -5,7 +5,7 @@ on:
     inputs:
       manual_tag:
         description: 'Tag for the build'
-        required: True
+        required: true
 
   push:
     tags:
@@ -108,6 +108,7 @@ jobs:
           $installerExe = Get-ChildItem -Path $outPath -Filter "*.exe" -File |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
+          if (-not $installerExe) { throw "Installer EXE not found in $outPath" }
           
           $relPath = $installerExe.FullName.Substring($env:GITHUB_WORKSPACE.Length + 1)
 
