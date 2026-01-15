@@ -14,6 +14,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      actions: write
+      contents: write
 
     steps:
       - name: Checkout Main
@@ -41,10 +44,10 @@ jobs:
         shell: pwsh
         run: |
           $chocoJob = Start-Job -ScriptBlock { 
-            choco install -y ffmpeg pkgconfiglite ninja innosetup
+            choco install -y pkgconfiglite ninja innosetup
           }
           $vcpkgJob = Start-Job -ScriptBlock {
-            vcpkg install curl:x64-windows cppwinrt:x64-windows leveldb:x64-windows spdlog:x64-windows libxml2:x64-windows nlohmann-json:x64-windows
+            vcpkg install ffmpeg:x64-windows curl:x64-windows cppwinrt:x64-windows leveldb:x64-windows spdlog:x64-windows libxml2:x64-windows nlohmann-json:x64-windows
           }
           
           Wait-Job $chocoJob, $vcpkgJob
@@ -66,6 +69,8 @@ jobs:
           $TAG = "${{ github.event.inputs.manual_tag }}"
           if (-not $TAG) { $TAG = "${{ github.ref_name }}" }
           if (-not $TAG) { $TAG = "manual-build" }
+          
+          if ($TAG -eq "main") { $TAG = "build-${{ github.run_number }}" }
           
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           
