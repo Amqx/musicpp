@@ -22,7 +22,6 @@ jobs:
       VCPKG_TARGET_TRIPLET: x64-windows
       VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg_binary_cache
       VCPKG_FEATURE_FLAGS: binarycaching
-      VCPKG_BUILD_TYPE: release
 
     steps:
       - name: Checkout Main
@@ -63,23 +62,14 @@ jobs:
             vcpkg-${{ runner.os }}-${{ env.VCPKG_TARGET_TRIPLET }}-
             vcpkg-${{ runner.os }}-
 
-      - name: Start keep-alive
-        shell: pwsh
-        run: |
-          Start-Job -ScriptBlock {
-            while ($true) {
-              Write-Host "Build still running..."
-              Start-Sleep -Seconds 240
-            }
-          }
-
       - name: Configure and build
         shell: pwsh
         run: |
           cmake -S "$env:GITHUB_WORKSPACE" -B "$env:GITHUB_WORKSPACE/build" -G Ninja `
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DVCPKG_BUILD_TYPE=release
           cmake --build "$env:GITHUB_WORKSPACE/build"
 
       - name: Package ZIP
@@ -124,8 +114,8 @@ jobs:
             "/DOutputDir=$outPath" `
             "/DOutputBaseFilename=musicpp-${{ env.RELEASE_TAG }}-setup"
           
-          $installerExe = Get-ChildItem $outPath -Filter *.exe | Select-Object -First 1
-          echo "INSTALLER_EXE=$($installerExe.FullName)" >> $env:GITHUB_ENV
+          $installerPath = $installerExe.FullName -replace '\\', '/'
+          echo "INSTALLER_EXE=$installerPath" >> $env:GITHUB_ENV
 
       - name: Upload to Releases
         uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2

@@ -68,7 +68,7 @@ The simplest path is CLion with VCPKG integration.
 5. Install the Discord Social SDK into `discordsdk/` (see next section).
 6. Build and run from CLion (Shift + F10).
 
-### Manual (CMake + Ninja)
+### Manual
 
 1. Install CMake, Ninja, and Visual Studio Build Tools:
    ```powershell
@@ -76,27 +76,35 @@ The simplest path is CLion with VCPKG integration.
    winget install --id=Ninja-build.Ninja
    winget install --id=Microsoft.VisualStudio.2022.Community
    ```
-2. Clone the repository:
+2. Install vcpkg (example path is `C:\vcpkg`):
+   ```powershell
+   git clone https://github.com/microsoft/vcpkg C:\vcpkg
+   C:\vcpkg\bootstrap-vcpkg.bat
+   ```
+3. Clone the repository:
    ```powershell
    git clone https://github.com/Amqx/musicpp
    ```
-3. Install dependencies (VCPKG is easiest):
+4. Install dependencies (manifest mode):
    ```powershell
-   vcpkg install curl leveldb cppwinrt nlohmann-json spdlog libxml2 ffmpeg pkgconf
+   cd musicpp
+   C:\vcpkg\vcpkg.exe install --triplet x64-windows
    ```
-4. Install the Discord Social SDK into `discordsdk/` (see next section).
-5. Configure and build:
+5. Install the Discord Social SDK into `discordsdk/` (see next section).
+6. Configure and build (run from a VS Developer PowerShell or after `vcvars64.bat`):
    ```powershell
-   mkdir build
-   cd build
-   cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_TOOLCHAIN_FILE={path-to-vcpkg}/scripts/buildsystems/vcpkg.cmake
-   cmake --build . --config Release --target musicpp
+   cmake -S . -B build -G Ninja `
+     -DCMAKE_BUILD_TYPE=Release `
+     -DCMAKE_TOOLCHAIN_FILE="C:\vcpkg\vcpkg.exe\scripts\buildsystems\vcpkg.cmake" `
+     -DVCPKG_TARGET_TRIPLET=x64-windows
+   cmake --build build
    ```
 
 ## Installing the Discord Social SDK
 
 Download the SDK from the [Discord Developer Portal](https://discord.com/developers/docs/game-sdk/sdk-starter-guide) (
-log in required). Choose the package without Unity/Unreal. Extract `discord_social_sdk-{version}.zip`, copy
+log in required).
+Choose Social SDK (not the unity/unreal package). Extract `discord_social_sdk-{version}.zip`, copy
 `discord_social_sdk` into the project root, rename it to `discordsdk`, and keep the `bin`, `lib`, and `include` folders
 intact so CMake can find them.
 
