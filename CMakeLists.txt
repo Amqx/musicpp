@@ -59,7 +59,6 @@ add_executable(musicpp
         src/lfm.cpp
         src/m3u8_internals.cpp
         src/m3u8.cpp
-        src/settings.cpp
         src/musicpp.cpp
 )
 

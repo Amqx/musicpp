@@ -33,6 +33,8 @@ public:
 
     [[nodiscard]] bool GetState() const;
 
+    void SetState(bool state);
+
     [[nodiscard]] std::wstring GetReason() const;
 
     void toggle();
