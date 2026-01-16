@@ -71,6 +71,7 @@ namespace {
     constexpr UINT ID_COPY_IMAGE = 1008;
     constexpr UINT ID_COPY_TITLE_ARTIST_ALBUM = 1009;
     constexpr UINT ID_PURGE_DATABASE = 1010;
+    constexpr UINT ID_OPEN_IMAGE = 1011;
     constexpr UINT_PTR DATA_TIMER_ID = 1;
     const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
 } // Constants
@@ -695,21 +696,17 @@ namespace {
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ARTIST, EscapeAmpersands(Truncate(artist)).c_str());
                             AppendMenu(hMenu, MF_STRING, ID_COPY_ALBUM, EscapeAmpersands(Truncate(album)).c_str());
                             AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-                            AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, L"Image");
-                            AppendMenu(hMenu, MF_STRING, ID_COPY_IMAGE, metadata.image_source.c_str());
+                            AppendMenu(hMenu, MF_STRING, ID_COPY_IMAGE, L"Copy Image");
+                            AppendMenu(hMenu, MF_STRING, ID_OPEN_IMAGE, L"Open Image");
                             AppendMenu(hMenu, MF_STRING, ID_TRAY_FORCE_REFRESH, L"Force Refresh");
                             AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         }
 
                         const wstring discord_state =
                                 ctx->discord->GetState() ? L"Discord active" : L"Discord disabled";
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, discord_state.c_str());
-                        AppendMenu(hMenu, MF_STRING, ID_TRAY_DISCORD_TOGGLE, TEXT("Toggle Discord"));
+                        AppendMenu(hMenu, MF_STRING, ID_TRAY_DISCORD_TOGGLE, discord_state.c_str());
 
-                        AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
-
-                        AppendMenu(hMenu, MF_STRING | MF_DISABLED | MF_GRAYED, 0, ctx->lastfm->GetReason().c_str());
-                        AppendMenu(hMenu, MF_STRING, ID_TRAY_LASTFM_TOGGLE, TEXT("Toggle LastFM"));
+                        AppendMenu(hMenu, MF_STRING, ID_TRAY_LASTFM_TOGGLE, ctx->lastfm->GetReason().c_str());
 
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                         AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
@@ -784,6 +781,12 @@ namespace {
                         const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
                         CopyToClipboard(ctx, metadata.image,
                                         L"Copied image URL\nSourced from: " + metadata.image_source);
+                        return 0;
+                    }
+
+                    case ID_OPEN_IMAGE: {
+                        const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
+                        ShellExecuteW(nullptr, L"open", metadata.image.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
                         return 0;
                     }
 
