@@ -1,4 +1,4 @@
-# MusicPP
+# MusicPP [![Build](https://github.com/Amqx/musicpp/actions/workflows/release.yml/badge.svg?branch=master)](https://github.com/Amqx/musicpp/actions/workflows/release.yml)
 
 Discord Rich Presence for the Windows Apple Music desktop app written in C++/WinRT.
 
