@@ -21,6 +21,9 @@ M3U8Processor::M3U8Processor(spdlog::logger *logger) {
 }
 
 M3U8Processor::~M3U8Processor() {
+    if (this->logger_) {
+        logger_->info("M3U8Processor Killed");
+    }
     exit();
     av_log_set_callback(av_log_default_callback);
 }
@@ -101,7 +104,7 @@ void M3U8Processor::loop() {
             failed_ = true;
             finished_.store(loop_gen, memory_order_release);
             has_job_ = false;
-            if (logger_) logger_->info("M3U8Processor couldn't find an animated image found");
+            if (logger_) logger_->info("M3U8Processor couldn't find an animated image");
             continue;
         }
 
