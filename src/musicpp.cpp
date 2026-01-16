@@ -844,7 +844,7 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
                     }
 
                     // Settings
-                    AppendMenu(hMenu, MF_STRING, ID_TRAY_SETTINGS, L"Settings...");
+                    AppendMenu(hMenu, MF_STRING, ID_TRAY_SETTINGS, L"Settings");
                     AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
 
                     // Exit
@@ -927,7 +927,7 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
                 }
 
                 case ID_TRAY_SETTINGS: {
-                    DialogBoxParamW(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_SETTINGS_DIALOG), ctx->hWnd, SettingsProc, reinterpret_cast<LPARAM>(ctx));
+                    DialogBoxParamW(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_SETTINGS_DIALOG), nullptr, SettingsProc, reinterpret_cast<LPARAM>(ctx));
                 }
 
                 default: {
@@ -986,6 +986,27 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
 }
 
 INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    auto CenterDialog = [](HWND window) {
+        RECT window_rect{};
+        if (!GetWindowRect(window, &window_rect)) {
+            return;
+        }
+        const int window_width = window_rect.right - window_rect.left;
+        const int window_height = window_rect.bottom - window_rect.top;
+
+        const HMONITOR monitor = MonitorFromWindow(window, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO monitor_info{};
+        monitor_info.cbSize = sizeof(monitor_info);
+        if (!GetMonitorInfo(monitor, &monitor_info)) {
+            return;
+        }
+
+        const RECT work_area = monitor_info.rcWork;
+        const int target_x = work_area.left + (work_area.right - work_area.left - window_width) / 2;
+        const int target_y = work_area.top + (work_area.bottom - work_area.top - window_height) / 2;
+        SetWindowPos(window, nullptr, target_x, target_y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+    };
+
     switch (msg) {
         case WM_INITDIALOG: {
             auto *ctx = reinterpret_cast<AppContext *>(lParam);
@@ -994,6 +1015,12 @@ INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
             if (!ctx) {
                 return FALSE;
             }
+
+            const LONG_PTR ex_style = GetWindowLongPtr(hDlg, GWL_EXSTYLE);
+            SetWindowLongPtr(hDlg, GWL_EXSTYLE, (ex_style | WS_EX_APPWINDOW) & ~WS_EX_TOOLWINDOW);
+            SetWindowPos(hDlg, nullptr, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+            CenterDialog(hDlg);
 
             if (const HICON hIcon = LoadIcon(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDI_APPICON))) {
                 SendMessage(hDlg, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hIcon));
