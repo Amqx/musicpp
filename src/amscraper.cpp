@@ -105,3 +105,11 @@ SearchResult Amscraper::SearchTracks(const std::string &title, const std::string
     xmlFreeDoc(doc);
     return results;
 }
+
+std::string Amscraper::GetRegion() {
+    return region_;
+}
+
+void Amscraper::SetRegion(const std::string &region) {
+    region_ = region;
+}

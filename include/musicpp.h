@@ -54,7 +54,7 @@ struct AppContext {
 namespace setup {
     string MakeLogName();
 
-    void PruneLogs(const filesystem::path &folder);
+    void PruneLogs(const filesystem::path &folder, wstringstream& out);
 
     bool IsValidRegion(const std::string &region);
 
@@ -70,13 +70,11 @@ namespace setup {
 
     void PurgeDatabase(const AppContext *ctx);
 
-    void CleanDatabase(const AppContext &ctx);
+    bool CleanDatabase(const AppContext &ctx, wstringstream& out);
 
-    bool InitializeDatabase(AppContext &ctx);
+    bool InitializeDatabase(AppContext &ctx, wstringstream& out);
 
-    bool RunConfigurationMode(const AppContext &ctx, string &region);
-
-    void LoadCredentials(AppContext &ctx, const bool &force_reset, const string &region);
+    bool LoadCredentials(AppContext &ctx, const string &region, bool& console_created);
 
     variant<int, AppContext> setup();
 }
@@ -86,9 +84,17 @@ namespace loop {
 
     void CopyToClipboard(const AppContext *ctx, const std::wstring &text, const wstring &label);
 
-    // static std::wstring GetDlgItemTextWStr(HWND hDlg, int id);
+    static std::wstring GetDlgItemTextWStr(HWND hDlg, int id);
 
-    static void SetDlgItemTextWStr(HWND hDlg, int id, const std::wstring& s);
+    static bool IsValidOrEmpty(const wstring &value, ValidationInputType type);
+
+    static bool AreSettingsInputsValid(HWND hDlg);
+
+    static void UpdateSettingsActionState(HWND hDlg);
+
+    static void PopulateRegionCombo(HWND hDlg, const std::string &selected_region);
+
+    static std::string GetComboSelection(HWND hCombo);
 
     void ApplySettings(HWND hDlg, const AppContext* ctx);
 
