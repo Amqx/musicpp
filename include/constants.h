@@ -113,5 +113,21 @@ constexpr uint64_t kInvalidTime = std::numeric_limits<uint64_t>::max();
 constexpr int kSnapshotTypeDiscord = 1;
 constexpr int kSnapshotTypeTray = 2;
 constexpr int kSnapshotTypeTime = 3;
+
+// Main
+constexpr unsigned int WM_TRAYICON = 0x8000 + 1;
+constexpr unsigned int ID_TRAY_EXIT = 1001;
+constexpr unsigned int ID_COPY_TITLE = 1002;
+constexpr unsigned int ID_COPY_ARTIST = 1003;
+constexpr unsigned int ID_COPY_ALBUM = 1004;
+constexpr unsigned int ID_TRAY_DISCORD_TOGGLE = 1005;
+constexpr unsigned int ID_TRAY_LASTFM_TOGGLE = 1006;
+constexpr unsigned int ID_TRAY_FORCE_REFRESH = 1007;
+constexpr unsigned int ID_COPY_IMAGE = 1008;
+constexpr unsigned int ID_COPY_TITLE_ARTIST_ALBUM = 1009;
+constexpr unsigned int ID_PURGE_DATABASE = 1010;
+constexpr unsigned int ID_OPEN_IMAGE = 1011;
+constexpr unsigned __int64 DATA_TIMER_ID = 1;
+
 #endif
 #endif
