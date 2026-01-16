@@ -1,2 +1,67 @@
+#include <winres.h>
 #include "constants.h"
+
 IDI_APPICON ICON "app-icon.ico"
+
+IDD_SETTINGS_DIALOG DIALOGEX 0, 0, 240, 160
+STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "MusicPP Settings"
+FONT 13, "Segoe UI"
+
+BEGIN
+    GROUPBOX    "General", IDC_STATIC, 8, 8, 224, 80
+
+    CONTROL     "Enable Discord Rich Presence",
+                IDC_CHECK_DISCORD,
+                "Button",
+                BS_AUTOCHECKBOX | WS_TABSTOP,
+                16, 24, 200, 12
+
+    CONTROL     "Enable Last.fm Scrobbling",
+                IDC_CHECK_LASTFM,
+                "Button",
+                BS_AUTOCHECKBOX | WS_TABSTOP,
+                16, 40, 220, 12
+
+    GROUPBOX "Credentials", IDC_STATIC, 8, 76, 264, 92
+
+    LTEXT       "Spotify Client ID: ",
+                IDC_STATIC,
+                16, 92, 90, 10
+    EDITTEXT    IDC_EDIT_SPOTIFY_ID,
+                112, 90, 152, 14,
+                ES_AUTOHSCROLL | WS_TABSTOP
+
+    LTEXT       "Spotify Secret: ",
+                IDC_STATIC,
+                16, 112, 90, 10
+    EDITTEXT    IDC_EDIT_SPOTIFY_SECRET,
+                112, 110, 152, 14,
+                ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+
+    LTEXT       "Last.fm API Key: ",
+                IDC_STATIC,
+                16, 132, 90, 10
+    EDITTEXT    IDC_EDIT_LFM_KEY,
+                112, 130, 152, 14,
+                ES_AUTOHSCROLL | WS_TABSTOP
+
+    LTEXT       "Last.fm Secret: ",
+                IDC_STATIC,
+                16, 152, 90, 10
+    EDITTEXT    IDC_EDIT_LFM_SECRET,
+                112, 150, 152, 14,
+                ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+
+    PUSHBUTTON  "Apply",
+                ID_APPLY,
+                80, 178, 60, 16
+
+    PUSHBUTTON  "OK",
+                IDOK,
+                148, 178, 60, 16
+
+    PUSHBUTTON  "Cancel",
+                IDCANCEL,
+                214, 178, 60, 16
+END
