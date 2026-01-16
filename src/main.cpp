@@ -811,6 +811,10 @@ namespace {
                 }
             }
 
+            case WM_POWERBROADCAST:
+                if (wParam == PBT_APMRESUMEAUTOMATIC || wParam == PBT_APMRESUMESUSPEND) {
+                    ctx->spotify->NotifyAwake();
+                }
 
             case WM_TIMER: {
                 if (!ctx || !ctx->player || !ctx->discord) {

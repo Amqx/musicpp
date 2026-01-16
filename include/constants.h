@@ -62,6 +62,7 @@ constexpr double kAlbumWeight = 0.2;
 constexpr int kSpotifyTokenLen = 16; // Length of the spotiy token - do not change!
 constexpr int kSpotifyTokenValidity = 3600; // How long a token is valid for, in s
 constexpr int kSpotifyRefreshInterval = 3550; // How long between each token refresh
+constexpr int kSpotifyRefreshSleepChunk = 120; // How long to sleep between each call of refresh
 
 // Last.FM
 constexpr int kMaxScrobbleAttempts = 3; // Max tries to scrobble a song

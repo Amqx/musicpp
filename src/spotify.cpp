@@ -42,9 +42,9 @@ SpotifyApi::~SpotifyApi() {
     }
 }
 
-string SpotifyApi::GetAccessToken() {
-    lock_guard lock(token_mutex_);
-    return access_token_;
+void SpotifyApi::NotifyAwake() {
+    if (logger_) logger_->info("System resume detected; waking Spotify refresh thread");
+    cv_.notify_all();
 }
 
 SearchResult SpotifyApi::SearchTracks(const string &title, const string &artist, const string &album) {
@@ -218,6 +218,11 @@ SearchResult SpotifyApi::SearchTracks(const string &title, const string &artist,
     }
 }
 
+string SpotifyApi::GetAccessToken() {
+    lock_guard lock(token_mutex_);
+    return access_token_;
+}
+
 bool SpotifyApi::RequestToken() {
     if (wstring spotify_client_token = ReadGenericCredential(kSpotifyDbClientToken); !spotify_client_token.empty()) {
         if (const auto split = spotify_client_token.find(L'|'); split != string::npos) {
@@ -300,7 +305,7 @@ bool SpotifyApi::RequestToken() {
 }
 
 void SpotifyApi::RefreshLoop() {
-    while (running_) {
+    while (running_.load(memory_order_relaxed)) {
         const uint64_t now = UnixSecondsNow();
         const uint64_t next_refresh = last_refresh_time_ + kSpotifyRefreshInterval;
 
@@ -309,21 +314,27 @@ void SpotifyApi::RefreshLoop() {
                 logger_->info("Spotify token refresh overdue by {} seconds after sleep",
                               now - next_refresh);
             }
-            if (!RequestToken()) {
-                if (logger_) logger_->warn("Failed to refresh Spotify token.");
+            if (RequestToken()) {
+                continue;
             }
+
+            if (logger_) {
+                logger_->warn("failed to refresh Spotify token, retrying in 10s...");
+            }
+
+            unique_lock lk(cv_mutex_);
+            cv_.wait_for(lk, seconds(10), [this] {
+                return !running_.load(memory_order_relaxed);
+            });
             continue;
         }
 
+        const uint64_t seconds_until_refresh = next_refresh - now;
+        const auto wait_duration = seconds(std::min<uint64_t>(seconds_until_refresh, kSpotifyRefreshSleepChunk));
         std::unique_lock lock(cv_mutex_);
-        const auto wake_time = system_clock::time_point{seconds(next_refresh)};
 
-        if (cv_.wait_until(lock, wake_time, [this] { return !running_.load(); })) {
+        if (cv_.wait_for(lock, wait_duration, [this] { return !running_.load(memory_order_relaxed); })) {
             return;
-        }
-
-        if (!RequestToken()) {
-            if (logger_) logger_->warn("Failed to refresh Spotify token.");
         }
     }
 }
