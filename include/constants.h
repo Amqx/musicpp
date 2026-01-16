@@ -14,7 +14,7 @@
 #include <chrono>
 #include <limits>
 
-const std::wstring kVersion = L"1.1.4"; // Animated image patch
+const std::wstring kVersion = L"1.1.5"; // Open images, lastfm auto resets
 
 // Searches and Matching
 constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
