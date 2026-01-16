@@ -248,7 +248,7 @@ void MediaPlayer::UpdateInfo() {
                             }
                         }
                     } else {
-                        if (logger_) logger_->info("M3U8 processor unsuccessful");
+                        if (logger_) logger_->info("M3U8Processor unsuccessful");
                     }
                     processor_->exit();
                 }

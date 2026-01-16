@@ -104,7 +104,7 @@ void M3U8Processor::loop() {
             failed_ = true;
             finished_.store(loop_gen, memory_order_release);
             has_job_ = false;
-            if (logger_) logger_->info("M3U8Processor couldn't find an animated image found");
+            if (logger_) logger_->info("M3U8Processor couldn't find an animated image");
             continue;
         }
 
