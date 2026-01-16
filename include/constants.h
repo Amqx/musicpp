@@ -6,13 +6,30 @@
 #define CONSTANTS_H
 
 #define IDI_APPICON 101 // image
-#define DISCORDPP_IMPLEMENTATION
+#define IDD_SETTINGS_DIALOG 102 // settings
+
+#define IDC_CHECK_DISCORD 2001
+#define IDC_CHECK_LASTFM 2002
+#define IDC_COMBO_REGION 2003
+
+#define IDC_EDIT_SPOTIFY_ID 2101
+#define IDC_EDIT_SPOTIFY_SECRET 2102
+#define IDC_EDIT_LFM_KEY 2103
+#define IDC_EDIT_LFM_SECRET 2104
+#define IDC_EDIT_IMGUR_ID 2105
+
+#define ID_APPLY 2201
+#define ID_PURGE_DATABASE 2202
+#define IDC_TEXT_DB_SIZE 2301
+
+#define ID_TRAY_SETTINGS 40001
 
 #ifndef RC_INVOKED
 #include <vector>
 #include <string>
 #include <chrono>
 #include <limits>
+#include <unordered_set>
 
 const std::wstring kVersion = L"1.1.5"; // Open images, lastfm auto resets
 
@@ -98,7 +115,8 @@ const std::wstring kLastFmDbSessionKey = L"musicpp/lastfm_sessionkey";
 constexpr int kGifMinCyclesBeforeProcess = 2;
 // How many cycles should be waited before a gif is allowed to process. Default is 2 cycles (10 seconds). I don't recommend this go lower
 constexpr int kGifFPS = 24;
-constexpr int64_t kGifMaxTotalFrames = 5 * kGifFPS; // 5 seconds of frames. When a gif is 10 seconds, Discord refuses to load it even when the gif exists. This value may change after more testing.
+constexpr int64_t kGifMaxTotalFrames = 5 * kGifFPS;
+// 5 seconds of frames. When a gif is 10 seconds, Discord refuses to load it even when the gif exists. This value may change after more testing.
 constexpr int64_t kGifMinFramesBeforeMatch = 2 * kGifFPS;
 // At least 2 seconds have passed before allowing a matched frame
 constexpr double kGifMatchThreshold = 1.0; // How strict loop detection should be. 1.0 means it has to be 100% match
@@ -113,5 +131,21 @@ constexpr uint64_t kInvalidTime = std::numeric_limits<uint64_t>::max();
 constexpr int kSnapshotTypeDiscord = 1;
 constexpr int kSnapshotTypeTray = 2;
 constexpr int kSnapshotTypeTime = 3;
+
+// Main
+constexpr unsigned int WM_TRAYICON = 0x8000 + 1;
+constexpr unsigned int ID_TRAY_EXIT = 1001;
+constexpr unsigned int ID_COPY_TITLE = 1002;
+constexpr unsigned int ID_COPY_ARTIST = 1003;
+constexpr unsigned int ID_COPY_ALBUM = 1004;
+constexpr unsigned int ID_TRAY_DISCORD_TOGGLE = 1005;
+constexpr unsigned int ID_TRAY_LASTFM_TOGGLE = 1006;
+constexpr unsigned int ID_TRAY_FORCE_REFRESH = 1007;
+constexpr unsigned int ID_COPY_IMAGE = 1008;
+constexpr unsigned int ID_COPY_TITLE_ARTIST_ALBUM = 1009;
+constexpr unsigned int ID_OPEN_IMAGE = 1011;
+constexpr unsigned __int64 DATA_TIMER_ID = 1;
+const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};
+
 #endif
 #endif

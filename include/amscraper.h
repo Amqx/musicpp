@@ -20,6 +20,10 @@ public:
 
     SearchResult SearchTracks(const std::string &title, const std::string &artist, const std::string &album) const;
 
+    std::string GetRegion();
+
+    void SetRegion(const std::string &region);
+
 private:
     std::string region_;
     spdlog::logger *logger_;

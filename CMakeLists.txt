@@ -59,6 +59,7 @@ add_executable(musicpp
         src/lfm.cpp
         src/m3u8_internals.cpp
         src/m3u8.cpp
+        src/musicpp.cpp
 )
 
 target_compile_definitions(musicpp PRIVATE -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T)

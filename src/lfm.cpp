@@ -528,6 +528,10 @@ bool Lfm::GetState() const {
     return enabled_;
 }
 
+void Lfm::SetState(const bool state) {
+    enabled_ = state;
+}
+
 std::wstring Lfm::GetReason() const {
     if (!valid_) {
         return L"Invalid API Credentials!";
