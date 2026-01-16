@@ -186,6 +186,10 @@ void Discordrp::toggle() {
     enabled_ = !enabled_;
 }
 
+void Discordrp::SetState(const bool state) {
+    enabled_ = state;
+}
+
 bool Discordrp::GetState() const {
     return enabled_;
 }

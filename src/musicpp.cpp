@@ -589,6 +589,41 @@ void loop::CopyToClipboard(const AppContext *ctx, const std::wstring &text, cons
     if (ctx->logger) ctx->logger->debug("Set clipboard to: {}", ConvertWString(text));
 }
 
+// static std::wstring loop::GetDlgItemTextWStr(const HWND hDlg, const int id) {
+//     const HWND hEdit = GetDlgItem(hDlg, id);
+//     if (!hEdit) return L"";
+//
+//     const int len = GetWindowTextLengthW(hEdit);
+//     if (len <= 0) return L"";
+//
+//     std::wstring s;
+//     s.resize(static_cast<size_t>(len + 1));
+//
+//     GetWindowTextW(hEdit, s.data(), len + 1);
+//     s.resize(wcslen(s.c_str()));
+//     return s;
+// }
+
+static void loop::SetDlgItemTextWStr(const HWND hDlg, const int id, const std::wstring &s) {
+    SetDlgItemTextW(hDlg, id, s.c_str());
+}
+
+void loop::ApplySettings(const HWND hDlg, const AppContext *ctx) {
+    const bool discord_enabled = IsDlgButtonChecked(hDlg, IDC_CHECK_DISCORD) == BST_CHECKED;
+    const bool lastfm_enabled = IsDlgButtonChecked(hDlg, IDC_CHECK_DISCORD) == BST_CHECKED;
+
+    ctx->discord->SetState(discord_enabled);
+    ctx->discord->SetState(lastfm_enabled);
+
+    // TODO: for now we aren't going to do anything with these, functionality hasn't been implemented
+    // const wstring new_s_id = GetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_ID);
+    // const wstring new_s_secret = GetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_SECRET);
+    // const wstring new_lfm_key = GetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_KEY);
+    // const wstring new_lfm_secret = GetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_SECRET);
+
+    MessageBoxW(hDlg, L"Settings applied.", L"MusicPP", MB_OK | MB_ICONINFORMATION);
+}
+
 LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
     auto *ctx = reinterpret_cast<AppContext *>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 
@@ -646,7 +681,6 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
             return 0;
         }
 
-
         case WM_TRAYICON: {
             if (LOWORD(lParam) == WM_RBUTTONUP) {
                 POINT pt{};
@@ -657,11 +691,16 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
 
 
                 if (const HMENU hMenu = CreatePopupMenu()) {
+
+                    // Version
                     const wstring v = L"MusicPP V" + kVersion;
                     AppendMenu(hMenu, MF_STRING | MF_DISABLED, 0, v.c_str());
+
+                    // TODO: Move this into settings later
                     AppendMenu(hMenu, MF_STRING, ID_PURGE_DATABASE, L"Purge Database");
                     AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
 
+                    // Metadata
                     const Snapshot metadata = ctx->player->GetSnapshot(kSnapshotTypeTray);
                     const wstring title = metadata.title;
                     const wstring artist = metadata.artist;
@@ -678,14 +717,13 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
                         AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
                     }
 
-                    const wstring discord_state =
-                            ctx->discord->GetState() ? L"Discord active" : L"Discord disabled";
-                    AppendMenu(hMenu, MF_STRING, ID_TRAY_DISCORD_TOGGLE, discord_state.c_str());
-
-                    AppendMenu(hMenu, MF_STRING, ID_TRAY_LASTFM_TOGGLE, ctx->lastfm->GetReason().c_str());
-
+                    // Settings
+                    AppendMenu(hMenu, MF_STRING, ID_TRAY_SETTINGS, L"Settings...");
                     AppendMenu(hMenu, MF_SEPARATOR, 0, nullptr);
+
+                    // Exit
                     AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
+
                     const UINT cmd = TrackPopupMenu(
                         hMenu,
                         TPM_RIGHTBUTTON | TPM_BOTTOMALIGN | TPM_RETURNCMD,
@@ -707,7 +745,6 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
 
             return 0;
         }
-
 
         case WM_COMMAND: {
             switch (LOWORD(wParam)) {
@@ -781,6 +818,10 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
                     return 0;
                 }
 
+                case ID_TRAY_SETTINGS: {
+                    DialogBoxParamW(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_SETTINGS_DIALOG), ctx->hWnd, SettingsProc, reinterpret_cast<LPARAM>(ctx));
+                }
+
                 default: {
                     return 0;
                 }
@@ -834,6 +875,59 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
     }
 
     return DefWindowProc(hWnd, msg, wParam, lParam);
+}
+
+INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_INITDIALOG: {
+            auto *ctx = reinterpret_cast<AppContext *>(lParam);
+            SetWindowLongPtr(hDlg, DWLP_USER, reinterpret_cast<LONG_PTR>(ctx));
+
+            if (!ctx) {
+                return FALSE;
+            }
+
+            CheckDlgButton(hDlg, IDC_CHECK_DISCORD, ctx->discord->GetState() ? BST_CHECKED : BST_UNCHECKED);
+
+            // TODO: Only allow this to be usable if the reason from lastfm->getreason() is enabled/ disabled, not invalid state
+            CheckDlgButton(hDlg, IDC_CHECK_LASTFM, ctx->lastfm->GetState() ? BST_CHECKED : BST_UNCHECKED);
+
+            SetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_ID, L"");
+            SetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_SECRET, L"");
+            SetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_KEY, L"");
+            SetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_SECRET, L"");
+
+            return TRUE;
+        }
+
+        case WM_COMMAND: {
+            auto *ctx = reinterpret_cast<AppContext *>(GetWindowLongPtr(hDlg, DWLP_USER));
+            if (!ctx) {
+                return FALSE;
+            }
+
+            switch (LOWORD(wParam)) {
+                case ID_APPLY: {
+                    ApplySettings(hDlg, ctx);
+                }
+                case IDOK: {
+                    ApplySettings(hDlg, ctx);
+                    EndDialog(hDlg, IDOK);
+                    return TRUE;
+                }
+                case IDCANCEL:
+                    EndDialog(hDlg, IDCANCEL);
+                    return TRUE;
+
+                default:
+                    break;
+            }
+        }
+
+        default: {
+            return FALSE;
+        }
+    }
 }
 
 int loop::loop(AppContext &ctx, const HINSTANCE hInstance) {

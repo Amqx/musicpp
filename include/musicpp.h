@@ -86,7 +86,15 @@ namespace loop {
 
     void CopyToClipboard(const AppContext *ctx, const std::wstring &text, const wstring &label);
 
+    // static std::wstring GetDlgItemTextWStr(HWND hDlg, int id);
+
+    static void SetDlgItemTextWStr(HWND hDlg, int id, const std::wstring& s);
+
+    void ApplySettings(HWND hDlg, const AppContext* ctx);
+
     LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+    INT_PTR CALLBACK SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam);
 
     int loop(AppContext &ctx, HINSTANCE hInstance);
 }
