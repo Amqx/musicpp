@@ -47,8 +47,7 @@ bool LooksLikeHexKey(const std::wstring &s, const size_t expected_len) {
     return true;
 }
 
-bool LooksLikeUrlOrJson(const std::wstring& s)
-{
+bool LooksLikeUrlOrJson(const std::wstring &s) {
     return s.find(L"http") != std::wstring::npos ||
            s.find(L"{") != std::wstring::npos ||
            s.find(L"}") != std::wstring::npos ||

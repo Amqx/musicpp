@@ -54,7 +54,7 @@ struct AppContext {
 namespace setup {
     string MakeLogName();
 
-    void PruneLogs(const filesystem::path &folder, wstringstream& out);
+    void PruneLogs(const filesystem::path &folder, wstringstream &out);
 
     bool IsValidRegion(const std::string &region);
 
@@ -70,11 +70,11 @@ namespace setup {
 
     void PurgeDatabase(const AppContext *ctx);
 
-    bool CleanDatabase(const AppContext &ctx, wstringstream& out);
+    bool CleanDatabase(const AppContext &ctx, wstringstream &out);
 
-    bool InitializeDatabase(AppContext &ctx, wstringstream& out);
+    bool InitializeDatabase(AppContext &ctx, wstringstream &out);
 
-    bool LoadCredentials(AppContext &ctx, const string &region, bool& console_created);
+    bool LoadCredentials(AppContext &ctx, const string &region, bool &console_created);
 
     variant<int, AppContext> setup();
 }

@@ -343,8 +343,7 @@ bool setup::InitializeDatabase(AppContext &ctx, wstringstream &out) {
     return false;
 }
 
-bool setup::LoadCredentials(AppContext &ctx, const string &region, bool& console_created) {
-
+bool setup::LoadCredentials(AppContext &ctx, const string &region, bool &console_created) {
     const wstring s_cid = EnsureCredential(kSpotifyDbClientIdKey, L"Spotify Client ID",
                                            L"https://developer.spotify.com/documentation/web-api/tutorials/getting-started",
                                            console_created, ctx.logger.get());
@@ -381,7 +380,7 @@ bool setup::LoadCredentials(AppContext &ctx, const string &region, bool& console
     if (ctx.logger) ctx.logger->info("M3U8Processor initialized");
 
     ctx.lastfm = make_unique<Lfm>(ConvertWString(lfm_key), ConvertWString(lfm_secret), ctx.db.get(),
-                                       ctx.logger.get());
+                                  ctx.logger.get());
     if (ctx.logger) {
         ctx.logger->info("LastFM initialized");
     }
@@ -395,8 +394,8 @@ bool setup::LoadCredentials(AppContext &ctx, const string &region, bool& console
     if (ctx.logger) ctx.logger->info("ImgurAPI initialized");
 
     ctx.player = make_unique<MediaPlayer>(ctx.scraper.get(), ctx.processor.get(), ctx.spotify.get(),
-                                               ctx.imgur.get(),
-                                               ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
+                                          ctx.imgur.get(),
+                                          ctx.lastfm.get(), ctx.db.get(), ctx.logger.get());
     if (ctx.logger) ctx.logger->info("mediaPlayer initialized");
 
     ctx.discord = make_unique<Discordrp>(ctx.player.get(), kDiscordApikey, ctx.db.get(), ctx.logger.get());
@@ -406,7 +405,6 @@ bool setup::LoadCredentials(AppContext &ctx, const string &region, bool& console
 }
 
 variant<int, AppContext> setup::setup() {
-
     AppContext ctx;
 
     if (wstringstream out; !InitializeDatabase(ctx, out)) {
@@ -502,7 +500,8 @@ void loop::UpdateTrayTooltip(AppContext *ctx) {
             if (const uint64_t duration = metadata.duration; duration > 0) {
                 const uint64_t elapsed = metadata.elapsed;
 
-                tip_stream << L"Timestamp: " << FormatTimestamp(elapsed) << L" / " << FormatTimestamp(duration) << L"\n";
+                tip_stream << L"Timestamp: " << FormatTimestamp(elapsed) << L" / " << FormatTimestamp(duration) <<
+                        L"\n";
             }
         } else {
             tip_stream << L"Track Paused" << L"\n";
@@ -673,7 +672,7 @@ static void loop::PopulateRegionCombo(const HWND hDlg, const string &selected_re
 
     int selected_index = -1;
     int default_index = -1;
-    for (const auto &region : kRegionList) {
+    for (const auto &region: kRegionList) {
         const wstring wregion = ConvertToWString(region);
         const int idx = static_cast<int>(SendMessageW(hCombo, CB_ADDSTRING, 0,
                                                       reinterpret_cast<LPARAM>(wregion.c_str())));
@@ -743,7 +742,8 @@ void loop::ApplySettings(const HWND hDlg, const AppContext *ctx) {
         WriteGenericCredential(kImgurDbClientIdKey, new_imgur_id, ctx->logger.get());
     }
 
-    MessageBoxW(hDlg, L"Settings applied. If you changed any API keys, please restart the app.", L"MusicPP", MB_OK | MB_ICONINFORMATION);
+    MessageBoxW(hDlg, L"Settings applied. If you changed any API keys, please restart the app.", L"MusicPP",
+                MB_OK | MB_ICONINFORMATION);
 }
 
 LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
