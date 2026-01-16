@@ -10,13 +10,17 @@
 
 #define IDC_CHECK_DISCORD 2001
 #define IDC_CHECK_LASTFM 2002
+#define IDC_COMBO_REGION 2003
 
 #define IDC_EDIT_SPOTIFY_ID 2101
 #define IDC_EDIT_SPOTIFY_SECRET 2102
 #define IDC_EDIT_LFM_KEY 2103
 #define IDC_EDIT_LFM_SECRET 2104
+#define IDC_EDIT_IMGUR_ID 2105
 
 #define ID_APPLY 2201
+#define ID_PURGE_DATABASE 2202
+#define IDC_TEXT_DB_SIZE 2301
 
 #define ID_TRAY_SETTINGS 40001
 
@@ -139,7 +143,6 @@ constexpr unsigned int ID_TRAY_LASTFM_TOGGLE = 1006;
 constexpr unsigned int ID_TRAY_FORCE_REFRESH = 1007;
 constexpr unsigned int ID_COPY_IMAGE = 1008;
 constexpr unsigned int ID_COPY_TITLE_ARTIST_ALBUM = 1009;
-constexpr unsigned int ID_PURGE_DATABASE = 1010;
 constexpr unsigned int ID_OPEN_IMAGE = 1011;
 constexpr unsigned __int64 DATA_TIMER_ID = 1;
 const std::unordered_set<std::string> kValidRegions{kRegionList.begin(), kRegionList.end()};

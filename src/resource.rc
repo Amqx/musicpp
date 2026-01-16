@@ -3,14 +3,14 @@
 
 IDI_APPICON ICON "app-icon.ico"
 
-IDD_SETTINGS_DIALOG DIALOGEX 0, 0, 280, 230 // Increased height from 210 to 230
+IDD_SETTINGS_DIALOG DIALOGEX 0, 0, 280, 280 // Increased height to fit general settings
 STYLE DS_SETFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "MusicPP Settings"
 FONT 9, "Segoe UI"
 
 BEGIN
     // General
-    GROUPBOX    "General", IDC_STATIC, 8, 8, 264, 55
+    GROUPBOX    "General", IDC_STATIC, 8, 8, 264, 80
 
     CONTROL     "Enable Discord Rich Presence",
                 IDC_CHECK_DISCORD,
@@ -24,53 +24,79 @@ BEGIN
                 BS_AUTOCHECKBOX | WS_TABSTOP,
                 16, 36, 220, 10
 
-    // Credentials
-    GROUPBOX "Credentials", IDC_STATIC, 8, 70, 264, 120
-
-    LTEXT       "Note: API Credentials are hidden for safety",
+    LTEXT       "Apple Music Region:",
                 IDC_STATIC,
-                16, 84, 240, 10, SS_NOPREFIX
+                16, 52, 90, 10
+    COMBOBOX    IDC_COMBO_REGION,
+                112, 50, 60, 120,
+                CBS_DROPDOWNLIST | WS_TABSTOP | WS_VSCROLL
+
+    LTEXT       "Database size:",
+                IDC_STATIC,
+                16, 68, 70, 10
+    LTEXT       "Calculating...",
+                IDC_TEXT_DB_SIZE,
+                88, 68, 90, 10
+
+    PUSHBUTTON  "Purge Database",
+                ID_PURGE_DATABASE,
+                182, 66, 80, 14
+
+    // Credentials
+    GROUPBOX "Credentials", IDC_STATIC, 8, 94, 264, 140
+
+    LTEXT       "Note: Previous API credentials are hidden for safety",
+                IDC_STATIC,
+                16, 108, 240, 10, SS_NOPREFIX
 
     // Spotify
     LTEXT       "Spotify Client ID:",
                 IDC_STATIC,
-                16, 102, 90, 10
+                16, 126, 90, 10
     EDITTEXT    IDC_EDIT_SPOTIFY_ID,
-                112, 100, 150, 14,
+                112, 124, 150, 14,
                 ES_AUTOHSCROLL | WS_TABSTOP
 
     LTEXT       "Spotify Secret:",
                 IDC_STATIC,
-                16, 122, 90, 10
+                16, 146, 90, 10
     EDITTEXT    IDC_EDIT_SPOTIFY_SECRET,
-                112, 120, 150, 14,
+                112, 144, 150, 14,
                 ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
 
     // Last.fm
     LTEXT       "Last.fm API Key:",
                 IDC_STATIC,
-                16, 142, 90, 10
+                16, 166, 90, 10
     EDITTEXT    IDC_EDIT_LFM_KEY,
-                112, 140, 150, 14,
+                112, 164, 150, 14,
                 ES_AUTOHSCROLL | WS_TABSTOP
 
     LTEXT       "Last.fm Secret:",
                 IDC_STATIC,
-                16, 162, 90, 10
+                16, 186, 90, 10
     EDITTEXT    IDC_EDIT_LFM_SECRET,
-                112, 160, 150, 14,
+                112, 184, 150, 14,
                 ES_AUTOHSCROLL | ES_PASSWORD | WS_TABSTOP
+
+    // Imgur
+    LTEXT       "Imgur Client ID:",
+                IDC_STATIC,
+                16, 206, 90, 10
+    EDITTEXT    IDC_EDIT_IMGUR_ID,
+                112, 204, 150, 14,
+                ES_AUTOHSCROLL | WS_TABSTOP
 
     // Results
     PUSHBUTTON  "Apply",
                 ID_APPLY,
-                80, 204, 60, 16
+                80, 248, 60, 16
 
     PUSHBUTTON  "OK",
                 IDOK,
-                146, 204, 60, 16
+                146, 248, 60, 16
 
     PUSHBUTTON  "Cancel",
                 IDCANCEL,
-                212, 204, 60, 16
+                212, 248, 60, 16
 END

@@ -8,18 +8,60 @@
 #include <string>
 #include <vector>
 #include <spdlog/spdlog.h>
+
+#include "consoleutils.h"
+#include "constants.h"
 #include "stringutils.h"
+#include "utils.h"
 
 std::wstring EnsureCredential(const std::wstring &key_path, const std::wstring &friendly_name,
-                              const std::wstring &help_url, const bool force_reset, spdlog::logger *logger) {
+                              const std::wstring &help_url, bool &console_created, spdlog::logger *logger) {
     std::wstring value = ReadGenericCredential(key_path);
 
-    if (value.empty() || force_reset) {
+    if (value.empty()) {
+        if (!console_created) {
+            SetupConsole();
+            console_created = true;
+        }
         std::wcout << L"\n" << friendly_name << L" not set! Please get one here: " << help_url << std::endl;
         std::wcout << L"Enter your " << friendly_name << L":" << std::endl;
 
         std::wstring new_value;
-        std::wcin >> new_value;
+        if (key_path == kSpotifyDbClientIdKey) {
+            while (std::wcin >> new_value) {
+                if (ValidateInput(new_value, SAPI_CLIENT_ID)) break;
+
+                std::wcout << L"Invalid key format! Try again: " << std::endl;
+            }
+        }
+        if (key_path == kSpotifyDbClientSecretKey) {
+            while (std::wcin >> new_value) {
+                if (ValidateInput(new_value, SAPI_SECRET)) break;
+
+                std::wcout << L"Invalid key format! Try again: " << std::endl;
+            }
+        }
+        if (key_path == kLastFmDbApikey) {
+            while (std::wcin >> new_value) {
+                if (ValidateInput(new_value, LFM_KEY)) break;
+
+                std::wcout << L"Invalid key format! Try again: " << std::endl;
+            }
+        }
+        if (key_path == kLastFmDbSecret) {
+            while (std::wcin >> new_value) {
+                if (ValidateInput(new_value, LFM_SECRET)) break;
+
+                std::wcout << L"Invalid key format! Try again: " << std::endl;
+            }
+        }
+        if (key_path == kImgurDbClientIdKey) {
+            while (std::wcin >> new_value) {
+                if (ValidateInput(new_value, IMGUR)) break;
+
+                std::wcout << L"Invalid key format! Try again: " << std::endl;
+            }
+        }
 
         WriteGenericCredential(key_path, new_value, logger);
         if (logger) {
