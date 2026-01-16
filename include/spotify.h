@@ -28,7 +28,7 @@ public:
 
     SpotifyApi &operator=(const SpotifyApi &) = delete;
 
-    string GetAccessToken();
+    void NotifyAwake();
 
     SearchResult SearchTracks(const string &title = "", const string &artist = "", const string &album = "");
 
@@ -43,6 +43,8 @@ private:
     uint64_t last_refresh_time_;
     std::condition_variable cv_;
     std::mutex cv_mutex_;
+
+    string GetAccessToken();
 
     bool RequestToken();
 
