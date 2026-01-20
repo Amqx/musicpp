@@ -24,6 +24,6 @@ void DeleteGenericCredential(const std::wstring &target_name, spdlog::logger *lo
 std::string wstr_to_str(const wchar_t *wstr);
 
 std::wstring EnsureCredential(const std::wstring &key_path, const std::wstring &friendly_name,
-                              const std::wstring &help_url, bool force_reset, spdlog::logger *logger = nullptr);
+                              const std::wstring &help_url, bool &console_created, spdlog::logger *logger = nullptr);
 
 #endif //MUSICPP_CREDHELPER_H

@@ -31,6 +31,8 @@ public:
 
     void toggle();
 
+    void SetState(bool state);
+
     [[nodiscard]] bool GetState() const;
 
 private:

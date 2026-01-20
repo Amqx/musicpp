@@ -542,7 +542,7 @@ void MediaPlayer::LoadDbImage(const uint64_t &curr_time, const string &song_key,
         if (source.empty()) {
             image_source_ = L"DB - unknown";
         } else {
-            image_source_ = L"DB, " + ConvertToWString(source);
+            image_source_ = ConvertToWString(source);
         }
         log.db_url = url;
     } catch (const exception &e) {
