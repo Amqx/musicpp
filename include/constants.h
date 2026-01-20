@@ -31,7 +31,7 @@
 #include <limits>
 #include <unordered_set>
 
-const std::wstring kVersion = L"1.1.5"; // Open images, lastfm auto resets
+const std::wstring kVersion = L"1.2"; // UI Update!
 
 // Searches and Matching
 constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
