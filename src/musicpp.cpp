@@ -607,16 +607,18 @@ static wstring FormatBytes(const uintmax_t bytes) {
     return out.str();
 }
 
-static void UpdateDbSizeLabel(const HWND hDlg) {
+static void UpdateDbSizeLabel(const HWND hDlg, spdlog::logger *logger) {
     filesystem::path db_path;
     if (!GetDatabasePath(db_path)) {
         SetDlgItemTextW(hDlg, IDC_TEXT_DB_SIZE, L"Unavailable");
+        if (logger) logger->warn("Failed to resolve database path for size label.");
         return;
     }
 
     const uintmax_t size = GetDirectorySize(db_path);
     const wstring label = FormatBytes(size);
     SetDlgItemTextW(hDlg, IDC_TEXT_DB_SIZE, label.c_str());
+    if (logger) logger->debug("Updated database size label to {}", ConvertWString(label));
 }
 
 static wstring loop::GetDlgItemTextWStr(const HWND hDlg, const int id) {
@@ -709,8 +711,14 @@ void loop::ApplySettings(const HWND hDlg, const AppContext *ctx) {
     const bool discord_enabled = IsDlgButtonChecked(hDlg, IDC_CHECK_DISCORD) == BST_CHECKED;
     const bool lastfm_enabled = IsDlgButtonChecked(hDlg, IDC_CHECK_LASTFM) == BST_CHECKED;
 
+    const bool prev_discord = ctx->discord->GetState();
+    const bool prev_lastfm = ctx->lastfm->GetState();
     ctx->discord->SetState(discord_enabled);
     ctx->lastfm->SetState(lastfm_enabled);
+    if (ctx->logger && (prev_discord != discord_enabled || prev_lastfm != lastfm_enabled)) {
+        ctx->logger->info("Updated feature toggles: discord {} -> {}, lastfm {} -> {}",
+                          prev_discord, discord_enabled, prev_lastfm, lastfm_enabled);
+    }
 
     const HWND hCombo = GetDlgItem(hDlg, IDC_COMBO_REGION);
     const string selected_region = ToLowerCase(GetComboSelection(hCombo));
@@ -718,28 +726,36 @@ void loop::ApplySettings(const HWND hDlg, const AppContext *ctx) {
         if (ctx->scraper && ctx->scraper->GetRegion() != selected_region) {
             ctx->scraper->SetRegion(selected_region);
             setup::SaveRegion(*ctx, selected_region);
+            if (ctx->logger) ctx->logger->info("Region updated via settings dialog to {}", selected_region);
         }
+    } else if (ctx->logger && !selected_region.empty()) {
+        ctx->logger->warn("Ignoring invalid region selection from settings dialog: {}", selected_region);
     }
 
     const wstring new_s_id = GetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_ID);
     if (ValidateInput(new_s_id, SAPI_CLIENT_ID)) {
         WriteGenericCredential(kSpotifyDbClientIdKey, new_s_id, ctx->logger.get());
+        if (ctx->logger) ctx->logger->info("Updated Spotify client ID via settings dialog.");
     }
     const wstring new_s_secret = GetDlgItemTextWStr(hDlg, IDC_EDIT_SPOTIFY_SECRET);
     if (ValidateInput(new_s_secret, SAPI_SECRET)) {
         WriteGenericCredential(kSpotifyDbClientSecretKey, new_s_secret, ctx->logger.get());
+        if (ctx->logger) ctx->logger->info("Updated Spotify client secret via settings dialog.");
     }
     const wstring new_lfm_key = GetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_KEY);
     if (ValidateInput(new_lfm_key, LFM_KEY)) {
         WriteGenericCredential(kLastFmDbApikey, new_lfm_key, ctx->logger.get());
+        if (ctx->logger) ctx->logger->info("Updated Last.fm API key via settings dialog.");
     }
     const wstring new_lfm_secret = GetDlgItemTextWStr(hDlg, IDC_EDIT_LFM_SECRET);
     if (ValidateInput(new_lfm_secret, LFM_SECRET)) {
         WriteGenericCredential(kLastFmDbSecret, new_lfm_secret, ctx->logger.get());
+        if (ctx->logger) ctx->logger->info("Updated Last.fm API secret via settings dialog.");
     }
     const wstring new_imgur_id = GetDlgItemTextWStr(hDlg, IDC_EDIT_IMGUR_ID);
     if (ValidateInput(new_imgur_id, IMGUR)) {
         WriteGenericCredential(kImgurDbClientIdKey, new_imgur_id, ctx->logger.get());
+        if (ctx->logger) ctx->logger->info("Updated Imgur client ID via settings dialog.");
     }
 
     MessageBoxW(hDlg, L"Settings applied. If you changed any API keys, please restart the app.", L"MusicPP",
@@ -927,7 +943,13 @@ LRESULT CALLBACK loop::WndProc(const HWND hWnd, const UINT msg, const WPARAM wPa
                 }
 
                 case ID_TRAY_SETTINGS: {
-                    DialogBoxParamW(GetModuleHandle(nullptr), MAKEINTRESOURCE(IDD_SETTINGS_DIALOG), nullptr, SettingsProc, reinterpret_cast<LPARAM>(ctx));
+                    if (ctx->logger) ctx->logger->info("Opening settings dialog from tray menu.");
+                    const INT_PTR result = DialogBoxParamW(GetModuleHandle(nullptr),
+                                                           MAKEINTRESOURCE(IDD_SETTINGS_DIALOG),
+                                                           nullptr, SettingsProc,
+                                                           reinterpret_cast<LPARAM>(ctx));
+                    if (ctx->logger) ctx->logger->info("Settings dialog closed with result {}", result);
+                    return 0;
                 }
 
                 default: {
@@ -1027,6 +1049,8 @@ INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
                 SendMessage(hDlg, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hIcon));
             }
 
+            if (ctx->logger) ctx->logger->info("Settings dialog initialized.");
+
             CheckDlgButton(hDlg, IDC_CHECK_DISCORD, ctx->discord->GetState() ? BST_CHECKED : BST_UNCHECKED);
 
             if (ctx->lastfm->GetReason() == L"Invalid API Credentials!") {
@@ -1048,7 +1072,7 @@ INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
             SetDlgItemTextW(hDlg, IDC_EDIT_LFM_SECRET, L"");
             SetDlgItemTextW(hDlg, IDC_EDIT_IMGUR_ID, L"");
             UpdateSettingsActionState(hDlg);
-            UpdateDbSizeLabel(hDlg);
+            UpdateDbSizeLabel(hDlg, ctx->logger.get());
 
             return TRUE;
         }
@@ -1062,17 +1086,21 @@ INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
             switch (LOWORD(wParam)) {
                 case ID_APPLY: {
                     if (!AreSettingsInputsValid(hDlg)) {
+                        if (ctx->logger) ctx->logger->warn("Settings apply blocked due to invalid inputs.");
                         return TRUE;
                     }
                     ApplySettings(hDlg, ctx);
+                    if (ctx->logger) ctx->logger->info("Settings applied without closing dialog.");
                     return TRUE;
                 }
                 case IDOK: {
                     if (!AreSettingsInputsValid(hDlg)) {
+                        if (ctx->logger) ctx->logger->warn("Settings apply blocked due to invalid inputs.");
                         return TRUE;
                     }
                     ApplySettings(hDlg, ctx);
                     EndDialog(hDlg, IDOK);
+                    if (ctx->logger) ctx->logger->info("Settings applied and dialog closed.");
                     return TRUE;
                 }
                 case ID_PURGE_DATABASE: {
@@ -1082,12 +1110,14 @@ INT_PTR loop::SettingsProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam) {
                         L"MusicPP",
                         MB_YESNO | MB_ICONWARNING);
                     if (result == IDYES) {
+                        if (ctx->logger) ctx->logger->info("User confirmed database purge from settings dialog.");
                         setup::PurgeDatabase(ctx);
-                        UpdateDbSizeLabel(hDlg);
+                        UpdateDbSizeLabel(hDlg, ctx->logger.get());
                     }
                     return TRUE;
                 }
                 case IDCANCEL:
+                    if (ctx->logger) ctx->logger->info("Settings dialog canceled.");
                     EndDialog(hDlg, IDCANCEL);
                     return TRUE;
 
