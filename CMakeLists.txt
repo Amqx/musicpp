@@ -24,11 +24,17 @@ pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
 
 # discordsdk config
 set(DISCORD_SDK_ROOT "${CMAKE_SOURCE_DIR}/discordsdk")
-set(DISCORD_SDK_LIB_DIR "${DISCORD_SDK_ROOT}/lib/release")
-set(DISCORD_SDK_BIN_DIR "${DISCORD_SDK_ROOT}/bin/release")
-set(DISCORD_SDK_INCLUDE_DIR "${DISCORD_SDK_ROOT}/include")
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(DISCORD_SDK_MODE "debug")
+else()
+    set(DISCORD_SDK_MODE "release")
+endif()
+
+set(DISCORD_SDK_LIB_DIR "${DISCORD_SDK_ROOT}/lib/${DISCORD_SDK_MODE}")
+set(DISCORD_SDK_BIN_DIR "${DISCORD_SDK_ROOT}/bin/${DISCORD_SDK_MODE}")
 set(DISCORD_LIB_PATH "${DISCORD_SDK_LIB_DIR}/discord_partner_sdk.lib")
 set(DISCORD_SHARED_LIB "${DISCORD_SDK_BIN_DIR}/discord_partner_sdk.dll")
+set(DISCORD_SDK_INCLUDE_DIR "${DISCORD_SDK_ROOT}/include")
 
 include_directories(include)
 include_directories(discordsdk)
