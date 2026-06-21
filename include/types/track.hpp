@@ -74,3 +74,16 @@ public:
 };
 std::ostream& operator<<(std::ostream& os, const Track& track);
 bool operator==(const Track& l, const Track& r);
+
+
+enum ImageType : std::uint8_t {
+    Static = 0,
+    Animated = 1
+};
+
+class EnrichedTrack {
+public:
+    Track track;
+    std::optional<std::string> url;
+    ImageType type;
+};
