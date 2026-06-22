@@ -13,14 +13,15 @@
 
 class RichPresence {
 public:
-    explicit RichPresence(const uint64_t& apikey);
+    explicit RichPresence(const uint64_t &apikey);
+
     ~RichPresence();
 
     /**
      * Sets a new Discord rich presence.
-     * @param track Basic details about the current track.
+     * @param track Enriched track details.
      */
-    void setPresence(const Track& track) const;
+    void setPresence(const EnrichedTrack &track) const;
 
 private:
     std::unique_ptr<discordpp::Client> _client = std::make_unique<discordpp::Client>();
