@@ -5,6 +5,9 @@
  */
 
 #include "metadata/http/curlWrapper.hpp"
+
+#include <memory>
+
 #include "metadata/http/curlGlobal.hpp"
 
 CurlWrapper::CurlWrapper(const std::string &endpoint) {
@@ -13,13 +16,25 @@ CurlWrapper::CurlWrapper(const std::string &endpoint) {
     if (!curl) {
         throw CurlInitError();
     }
-    curl_easy_setopt(curl, CURLOPT_URL, endpoint.c_str());
+
+    const auto encoded = std::unique_ptr<char, decltype(&curl_free)>(curl_easy_escape(curl, endpoint.c_str(), endpoint.length()), curl_free);
+
+    curl_easy_setopt(curl, CURLOPT_URL, encoded.get());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
     errbuf[0] = '\0';
+}
+
+void CurlWrapper::addMime(const std::vector<unsigned char> &bytes, const std::string& mimeType) const {
+    curl_mime *mime = curl_mime_init(curl);
+    curl_mimepart *part = curl_mime_addpart(mime);
+    curl_mime_name(part, mimeType.c_str());
+    curl_mime_data(part, reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_mime_free(mime);
 }
 
 CurlWrapper::~CurlWrapper() {

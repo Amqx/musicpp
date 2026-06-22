@@ -9,6 +9,8 @@
 #include <curl/curl.h>
 #include <stdexcept>
 
+#include "types/track.hpp"
+
 class CurlInitError : public std::exception {
 public:
     [[nodiscard]] const char* what() const noexcept override {
@@ -41,6 +43,8 @@ public:
     void addHeader(const std::string& header);
 
     void setUserAgent(const std::string& useragent = "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+
+    void addMime(const std::vector<unsigned char> &bytes, const std::string& mimeType) const;
 
     CurlResult performCall();
 };
