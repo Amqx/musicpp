@@ -81,6 +81,14 @@ enum ImageType : std::uint8_t {
     Animated = 1
 };
 
+constexpr std::string to_string(const ImageType& type) {
+    switch (type) {
+        case Static: return "Static";
+        case Animated: return "Animated";
+        default: return "Unknown";
+    }
+}
+
 class EnrichedTrack {
 public:
     Track track;
