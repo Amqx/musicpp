@@ -10,7 +10,7 @@
 #include "source.hpp"
 #include "types/results.hpp"
 
-class Scraper : MetadataWebSource {
+class Scraper : public MetadataWebSource {
 public:
     explicit Scraper(const std::string& region);
 

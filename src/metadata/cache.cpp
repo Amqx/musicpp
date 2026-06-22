@@ -54,7 +54,7 @@ std::string getKey(const Track& track) {
     const auto title = normalize(track.identity.title);
     const auto artist = normalize(track.identity.artist);
     const auto album = normalize(track.identity.album);
-    return title + artist + album;
+    return title + "|" + artist + "|" + album;
 }
 
 /**

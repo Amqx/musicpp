@@ -20,7 +20,7 @@ std::string Scraper::identify() {
     return "Apple Music Web Scraper";
 }
 
-constexpr double kMatchGenerosity = 0.6; // How close fuzzy matches should be to each other
+constexpr double kMatchGenerosity = 60.0; // Minimum similarity percentage (0-100) for a fuzzy match
 const std::string kTargetSize = "1000x1000bb-60";
 
 std::string toLowerCase(const std::string &str) {
@@ -178,7 +178,8 @@ xmlNodePtr findMatchingListItem(const xmlNodePtr &node, const std::string &title
 }
 
 SearchResult Scraper::searchTrack(const Track &track) {
-    const std::string url = "https://music.apple.com/" + _region + "/search?term=" + track.identity.title + " " + track.identity.album + " " + track.identity.artist;
+    const std::string term = CurlWrapper::escape(track.identity.title + " " + track.identity.album + " " + track.identity.artist);
+    const std::string url = "https://music.apple.com/" + _region + "/search?term=" + term;
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl.reset(new CurlWrapper(url));
@@ -192,7 +193,7 @@ SearchResult Scraper::searchTrack(const Track &track) {
         return {};
     }
 
-    htmlDocPtr doc = htmlReadMemory(result.output.c_str(), static_cast<int>(result.output.size()), nullptr, nullptr, HTML_PARSE_NOERROR / HTML_PARSE_NOWARNING);
+    htmlDocPtr doc = htmlReadMemory(result.output.c_str(), static_cast<int>(result.output.size()), nullptr, nullptr, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
     if (!doc) return {};
 
     SearchResult r;

@@ -1,5 +1,5 @@
 /**
- * @file searchResult.hpp
+ * @file results.hpp
  * @author Jonathan Deng
  * @date 21-Jun-26
  */

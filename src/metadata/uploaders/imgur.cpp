@@ -19,7 +19,7 @@ std::string Imgur::identify() {
     return "Imgur image host";
 }
 
-UploadResult Imgur::uploadImage(const std::vector<unsigned char> bytes, ImageType type) {
+UploadResult Imgur::uploadImage(const std::vector<unsigned char>& bytes, ImageType type) {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl.reset(new CurlWrapper("https://api.imgur.com/3/image"));

@@ -7,6 +7,7 @@
 #pragma once
 #include <string>
 #include <chrono>
+#include <optional>
 
 class TrackIdentity {
 public:
@@ -93,5 +94,5 @@ class EnrichedTrack {
 public:
     Track track;
     std::optional<std::string> url;
-    ImageType type;
+    ImageType type = Static;
 };
