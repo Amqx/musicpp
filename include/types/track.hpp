@@ -7,7 +7,8 @@
 #pragma once
 #include <string>
 #include <chrono>
-#include <optional>
+#include <vector>
+#include <ostream>
 
 class TrackIdentity {
 public:
@@ -90,9 +91,22 @@ constexpr std::string to_string(const ImageType& type) {
     }
 }
 
+class ImageUrl {
+public:
+    std::string url;
+    ImageType type = Static;
+    std::string source;
+};
+
+class SongUrl {
+public:
+    std::string url;
+    std::string source;
+};
+
 class EnrichedTrack {
 public:
     Track track;
-    std::optional<std::string> url;
-    ImageType type = Static;
+    ImageUrl image;
+    std::vector<SongUrl> songUrls;
 };
