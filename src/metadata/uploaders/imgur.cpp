@@ -4,6 +4,7 @@
  * @date 21-Jun-26
  */
 
+#include <memory>
 #include <nlohmann/json.hpp>
 #include "metadata/uploaders/imgur.hpp"
 
@@ -16,13 +17,13 @@ Imgur::Imgur(const std::string &apikey) {
 }
 
 std::string Imgur::identify() {
-    return "Imgur image host";
+    return kIDENTITY;
 }
 
 UploadResult Imgur::uploadImage(const std::vector<unsigned char>& bytes, ImageType type) {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
-        curl.reset(new CurlWrapper("https://api.imgur.com/3/image"));
+        curl = std::make_unique<CurlWrapper>("https://api.imgur.com/3/image");
     } catch (const std::exception& e) {
         (void)e;
         return {};

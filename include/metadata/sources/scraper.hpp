@@ -20,4 +20,5 @@ public:
 
 private:
     std::string _region;
+    const std::string kIDENTITY = "Apple Music Web Scraper";
 };

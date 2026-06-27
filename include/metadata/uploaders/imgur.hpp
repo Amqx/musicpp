@@ -16,4 +16,5 @@ public:
     UploadResult uploadImage(const std::vector<unsigned char>& bytes, ImageType type) override;
 private:
     std::string _apikey;
+    const std::string kIDENTITY = "Imgur Image Host";
 };

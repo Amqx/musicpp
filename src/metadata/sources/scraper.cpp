@@ -6,6 +6,7 @@
 
 #include "metadata/sources/scraper.hpp"
 
+#include <memory>
 #include <regex>
 
 #include "metadata/http/curlWrapper.hpp"
@@ -17,7 +18,7 @@ Scraper::Scraper(const std::string &region) {
 }
 
 std::string Scraper::identify() {
-    return "Apple Music Web Scraper";
+    return kIDENTITY;
 }
 
 constexpr double kMatchGenerosity = 60.0; // Minimum similarity percentage (0-100) for a fuzzy match
@@ -182,7 +183,7 @@ SearchResult Scraper::searchTrack(const Track &track) {
     const std::string url = "https://music.apple.com/" + _region + "/search?term=" + term;
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
-        curl.reset(new CurlWrapper(url));
+        curl = std::make_unique<CurlWrapper>(url);
     } catch (const std::exception& e) {
         (void)e;
         return {};
