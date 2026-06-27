@@ -25,7 +25,7 @@ using Json = nlohmann::json;
 std::string Md5(const std::string &input) {
     HCRYPTPROV hProv = 0;
     HCRYPTHASH hHash = 0;
-    BYTE digest[16];
+    BYTE digest[16] = {};
     DWORD digest_len = 16;
 
     if (!CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
@@ -115,13 +115,12 @@ LastFm::LastFm(const std::string &apikey, const std::string &apiSecret) {
     _apiSecret = apiSecret;
 
     if (sessionKey.empty() || !testSessionKey(sessionKey) || apikey.empty() || apiSecret.empty()) {
-        this->_authenticated.store(false, std::memory_order::memory_order_relaxed);
+        _authenticated.store(false, std::memory_order::memory_order_relaxed);
         return;
     }
 
-    this->_authenticated.store(true, std::memory_order::memory_order_relaxed);
-    this->_sessionKey = sessionKey;
-    return;
+    _authenticated.store(true, std::memory_order::memory_order_relaxed);
+    _sessionKey = sessionKey;
 }
 
 std::string LastFm::getNewSession(const std::string &token) const {
@@ -252,6 +251,7 @@ bool LastFm::authenticateUser() {
         if (!key.empty()) {
             watcher.request_stop();
             _sessionKey = key;
+            _authenticated.store(true, std::memory_order::memory_order_relaxed);
             return true;
         }
         std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -259,6 +259,7 @@ bool LastFm::authenticateUser() {
         if (timer >= 300) {
             std::cout << "Authentication timed out after 5 minutes.\n";
             cancelled.store(true, std::memory_order::memory_order_relaxed);
+            watcher.request_stop();
         }
     }
     watcher.join();
