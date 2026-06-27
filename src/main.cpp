@@ -14,7 +14,7 @@
 #include <memory>
 #include <thread>
 #include <vector>
-#include<discord/rp.hpp>
+#include <discord/rp.hpp>
 
 [[noreturn]] int main() {
     auto applemusic = AmWin();

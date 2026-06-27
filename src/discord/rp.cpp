@@ -96,11 +96,35 @@ void setAssets(discordpp::Activity &activity, const EnrichedTrack &track) {
     activity.SetAssets(assets);
 }
 
+void setButtons(discordpp::Activity &activity, const EnrichedTrack &track) {
+    if (track.songUrls.empty()) {
+        return;
+    }
+
+    int count = 0;
+    for (const auto &[url, source] : track.songUrls) {
+        if (count == 2)
+            break;
+        discordpp::ActivityButton button;
+
+        if (source == "Apple Music Web Scraper") {
+            button.SetLabel("Apple Music");
+        } else {
+            button.SetLabel(source);
+        }
+
+        button.SetUrl(url);
+        activity.AddButton(button);
+        count++;
+    }
+}
+
 void RichPresence::setPresence(const EnrichedTrack &track) const {
     discordpp::Activity activity;
     setIdentity(activity, track.track);
     setTimeline(activity, track.track);
     setAssets(activity, track);
+    setButtons(activity, track);
 
     _client->UpdateRichPresence(activity, [] (const discordpp::ClientResult &result) {
         (void)result;
