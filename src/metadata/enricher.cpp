@@ -43,10 +43,10 @@ EnrichedTrack Enricher::enrich(const Track &track,
             continue; // nothing to gain from this source
         }
 
-        const auto [image_url, web_url] = source->searchTrack(track);
+        const auto [image_url, web_url, image_type] = source->searchTrack(track);
 
         if (needImage && !image_url.empty()) {
-            out.image = ImageUrl{image_url, Static, platform};
+            out.image = ImageUrl{image_url, image_type, platform};
             needImage = false;
             changed = true;
         }

@@ -7,10 +7,13 @@
 #pragma once
 #include <string>
 
+#include "types/track.hpp"
+
 class SearchResult {
 public:
     std::string image_url;
     std::string web_url;
+    ImageType image_type = Static;
 };
 
 class UploadResult {
