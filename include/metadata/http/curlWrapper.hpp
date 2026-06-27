@@ -54,7 +54,7 @@ public:
      * @param value Raw value to encode.
      * @return Percent-encoded value.
      */
-    static std::string escape(const std::string& value);
+    [[nodiscard]] static std::string escape(const std::string &value);
 
     void addHeader(const std::string& header);
 
@@ -67,5 +67,7 @@ public:
      */
     void addMime(const std::vector<unsigned char> &bytes, const std::string& name);
 
-    CurlResult performCall();
+    void usePost(const std::string &fields) const;
+
+    [[nodiscard]] CurlResult performCall();
 };

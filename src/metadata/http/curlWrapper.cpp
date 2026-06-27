@@ -42,6 +42,11 @@ void CurlWrapper::addMime(const std::vector<unsigned char> &bytes, const std::st
     curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
 }
 
+void CurlWrapper::usePost(const std::string &fields) const {
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, fields.c_str());
+}
+
 CurlWrapper::~CurlWrapper() {
     if (headers) curl_slist_free_all(headers);
     if (mime) curl_mime_free(mime);
