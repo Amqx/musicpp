@@ -55,6 +55,12 @@ std::string Md5(const std::string &input) {
 bool LastFm::scrobble(const Track &track) const {
     if (!_authenticated.load(std::memory_order::memory_order_relaxed))
         return false;
+    const auto curr = track.timing.current();
+    const auto total = track.timing.total();
+    if (curr <= kTrackLengthForScrobble || (
+            curr < total && std::chrono::duration<double>(curr) / std::chrono::duration<
+                double>(total) <= kTrackLengthPercentageForScrobble))
+        return false;
 
     auto trimAlbumName = [](const std::string &input) {
         auto pos = input.rfind(" — Single");

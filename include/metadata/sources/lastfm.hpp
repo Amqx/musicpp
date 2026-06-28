@@ -40,9 +40,11 @@ private:
     std::string _sessionKey{};
     std::string _apikey{};
     std::string _apiSecret{};
-    std::chrono::seconds _validity;
 
     std::atomic<bool> _authenticated{};
+
+    const std::chrono::seconds kTrackLengthForScrobble{30};
+    const double kTrackLengthPercentageForScrobble{0.5};
 
     const std::string kIDENTITY = "LastFm API";
     const std::string kSESSION_STORAGE_KEY = "amqx_musicppv2_lastfm_apisecret";
