@@ -7,6 +7,7 @@
 #pragma once
 #include <string>
 #include <chrono>
+#include <optional>
 #include <vector>
 #include <ostream>
 
@@ -115,9 +116,18 @@ public:
     std::string source;
 };
 
+class PauseDetails {
+public:
+    /**
+     * Time the current pause began, in seconds since the unix epoch. Empty while not paused.
+     */
+    std::optional<int64_t> since;
+};
+
 class EnrichedTrack {
 public:
     Track track;
     ImageUrl image;
     std::vector<SongUrl> songUrls;
+    PauseDetails pause;
 };

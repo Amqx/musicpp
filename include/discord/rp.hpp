@@ -19,9 +19,15 @@ public:
 
     /**
      * Sets a new Discord rich presence.
-     * @param track Enriched track details.
+     * @param track Enriched track details, carrying its own pause details.
      */
     void setPresence(const EnrichedTrack &track) const;
+
+    /**
+     * Tears the rich presence down, leaving the user with no activity. Used when nothing is
+     * playing at all, which is distinct from a paused or stopped track.
+     */
+    void clearPresence() const;
 
 private:
     std::shared_ptr<discordpp::Client> _client = std::make_shared<discordpp::Client>();

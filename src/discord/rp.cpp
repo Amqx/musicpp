@@ -146,13 +146,27 @@ void setIdentity(discordpp::Activity &activity, const Track &track) {
     activity.SetType(discordpp::ActivityTypes::Listening);
 }
 
-void setTimeline(discordpp::Activity &activity, const Track &track) {
-    if (track.status == Playing) {
-        discordpp::ActivityTimestamps timestamps;
-        timestamps.SetStart(track.timing.start());
-        timestamps.SetEnd(track.timing.end());
+/**
+ * Sets an activity's timestamps. A playing track carries a start/end pair, which Discord renders
+ * as a progress bar. A paused track carries only the instant the pause began, which Discord
+ * renders as time elapsed since the pause. Anything else carries no timestamps at all.
+ * @param activity Discord activity object.
+ * @param track Track details.
+ * @param pause Pause details for the track, empty while playing.
+ */
+void setTimeline(discordpp::Activity &activity, const Track &track, const PauseDetails &pause) {
+    discordpp::ActivityTimestamps timestamps;
+    if (pause.since.has_value()) {
+        timestamps.SetStart(*pause.since);
         activity.SetTimestamps(timestamps);
+        return;
     }
+    if (track.status != Playing) {
+        return;
+    }
+    timestamps.SetStart(track.timing.start());
+    timestamps.SetEnd(track.timing.end());
+    activity.SetTimestamps(timestamps);
 }
 
 /**
@@ -162,11 +176,12 @@ void setTimeline(discordpp::Activity &activity, const Track &track) {
  * @param track Enriched track details.
  */
 void setAssets(discordpp::Activity &activity, const EnrichedTrack &track) {
-    if (track.image.url.empty()) {
-        return;
-    }
     discordpp::ActivityAssets assets;
-    assets.SetLargeImage(track.image.url);
+    if (track.image.url.empty()) {
+        assets.SetLargeImage("default");
+    } else {
+        assets.SetLargeImage(track.image.url);
+    }
     if (!track.track.identity.album.empty()) {
         assets.SetLargeText(discordStringBounds(track.track.identity.album));
     }
@@ -189,6 +204,8 @@ void setButtons(discordpp::Activity &activity, const EnrichedTrack &track) {
 
         if (source == "Apple Music Web Scraper") {
             button.SetLabel("Apple Music");
+        } else if (source == "LastFm API") {
+            button.SetLabel("Last.fm");
         } else {
             button.SetLabel(source);
         }
@@ -202,13 +219,17 @@ void setButtons(discordpp::Activity &activity, const EnrichedTrack &track) {
 void RichPresence::setPresence(const EnrichedTrack &track) const {
     discordpp::Activity activity;
     setIdentity(activity, track.track);
-    setTimeline(activity, track.track);
+    setTimeline(activity, track.track, track.pause);
     setAssets(activity, track);
     setButtons(activity, track);
 
     _client->UpdateRichPresence(activity, [](const discordpp::ClientResult &result) {
         (void)result;
     });
+}
+
+void RichPresence::clearPresence() const {
+    _client->ClearRichPresence();
 }
 
 RichPresence::~RichPresence() {
