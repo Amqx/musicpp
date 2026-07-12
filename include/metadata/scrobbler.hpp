@@ -32,4 +32,13 @@ public:
      * @return Whether the scrobble was accepted.
      */
     [[nodiscard]] virtual bool scrobble(const Track &track) const = 0;
+
+    /**
+     * Sets the user's currently playing status.
+     * @param track Track currently playing.
+     * @return Whether the status set was accepted.
+     */
+    [[nodiscard]] virtual bool setPlaying(const Track &track) const = 0;
+
+    [[nodiscard]] virtual std::string identify() = 0;
 };

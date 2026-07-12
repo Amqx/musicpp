@@ -14,5 +14,5 @@ public:
 
     virtual SearchResult searchTrack(const Track &track) = 0;
 
-    virtual std::string identify() = 0;
+    [[nodiscard]] virtual std::string identify() = 0;
 };

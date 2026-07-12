@@ -53,6 +53,22 @@ std::string Md5(const std::string &input) {
     return out;
 }
 
+/**
+ * Trims trailing album identifiers.
+ * @param input Album name.
+ * @return Trimmed name.
+ */
+std::string trimAlbumName(const std::string &input) {
+    auto pos = input.rfind(" — Single");
+    if (pos == std::string::npos) {
+        pos = input.rfind(" — EP");
+        if (pos == std::string::npos) {
+            return input;
+        }
+    }
+    return input.substr(0, pos);
+}
+
 bool LastFm::scrobble(const Track &track) const {
     if (!_authenticated.load(std::memory_order::memory_order_relaxed))
         return false;
@@ -62,17 +78,6 @@ bool LastFm::scrobble(const Track &track) const {
             curr < total && std::chrono::duration<double>(curr) / std::chrono::duration<
                 double>(total) <= kTrackLengthPercentageForScrobble))
         return false;
-
-    auto trimAlbumName = [](const std::string &input) {
-        auto pos = input.rfind(" — Single");
-        if (pos == std::string::npos) {
-            pos = input.rfind(" — EP");
-            if (pos == std::string::npos) {
-                return input;
-            }
-        }
-        return input.substr(0, pos);
-    };
 
     std::string body;
 
@@ -341,4 +346,49 @@ bool LastFm::authed() const {
 
 std::string LastFm::identify() {
     return kIDENTITY;
+}
+
+bool LastFm::setPlaying(const Track &track) const {
+    if (!_authenticated.load(std::memory_order::memory_order_relaxed))
+        return false;
+
+    const std::string url = "https://ws.audioscrobbler.com/2.0/";
+    std::string body;
+    const std::string duration = std::to_string(
+        std::chrono::duration_cast<std::chrono::seconds>(track.timing.total()).count());
+    const std::string artist = CurlWrapper::escape(track.identity.artist);
+    const std::string album = CurlWrapper::escape(track.identity.album);
+    const std::string title = CurlWrapper::escape(track.identity.title);
+    const std::string hash = Md5(
+        "album" + trimAlbumName(album) + "api_key" + _apikey + "artist" + artist + "duration" +
+        duration + "method" + "track.updateNowPlaying" + "sk" + _sessionKey + "track" + title +
+        _apiSecret);
+    body += "method=track.updateNowPlaying";
+    body += "&api_key=" + _apikey;
+    body += "&artist=" + artist;
+    body += "&track=" + title;
+    body += "&album=" + album;
+    body += "&duration=" + duration;
+    body += "&sk=" + _sessionKey;
+    body += "&api_sig=" + hash;
+
+    std::unique_ptr<CurlWrapper> curl = nullptr;
+    try {
+        curl = std::make_unique<CurlWrapper>(url);
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("Set now playing for '{} - {}' failed: {}",
+                                      track.identity.artist, track.identity.title, e.what());
+    }
+
+    curl->addHeader("Content-Type: application/x-www-form-urlencoded");
+    curl->usePost(body);
+    const auto &r = curl->performCall();
+    if (r.curlcode != CURLE_OK) {
+        return false;
+    }
+    if (r.output.find("lfm status=\"ok\"") != std::string::npos) {
+        logging::get("lastfm")->info("Successfully set new LastFm now playing");
+        return true;
+    }
+    return false;
 }

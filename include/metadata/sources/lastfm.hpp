@@ -37,6 +37,8 @@ public:
 
     [[nodiscard]] bool scrobble(const Track &track) const override;
 
+    [[nodiscard]] bool setPlaying(const Track &track) const override;
+
 private:
     std::string _sessionKey{};
     std::string _apikey{};
