@@ -6,6 +6,7 @@
 
 #include "metadata/sources/scraper.hpp"
 #include "metadata/matching.hpp"
+#include "log/log.hpp"
 
 #include <memory>
 #include <regex>
@@ -74,7 +75,7 @@ xmlNodePtr findDescendantWithAttr(const xmlNodePtr &node, const char *tag_name,
         }
         // Recurse into children
         if (current->children) {
-            if (const xmlNodePtr found = findDescendantWithAttr(
+            if (xmlNodePtr found = findDescendantWithAttr(
                 current->children, tag_name, attr_name, attr_value)) {
                 return found;
             }
@@ -94,7 +95,7 @@ xmlNodePtr findDivWithClass(const xmlNodePtr &node, const std::string &class_val
             }
         }
         if (current->children) {
-            if (const xmlNodePtr found = findDivWithClass(current->children, class_value)) {
+            if (xmlNodePtr found = findDivWithClass(current->children, class_value)) {
                 return found;
             }
         }
@@ -104,10 +105,10 @@ xmlNodePtr findDivWithClass(const xmlNodePtr &node, const std::string &class_val
 
 bool trackMatches(const xmlNodePtr &li_node, const std::string &target_title,
                   const std::string &target_artist) {
-    const xmlNodePtr title_node = findDescendantWithAttr(li_node, nullptr, "data-testid",
-                                                         "track-lockup-title");
-    const xmlNodePtr artist_node = findDescendantWithAttr(li_node, "span", "data-testid",
-                                                          "track-lockup-subtitle");
+    xmlNodePtr title_node = findDescendantWithAttr(li_node, nullptr, "data-testid",
+                                                   "track-lockup-title");
+    xmlNodePtr artist_node = findDescendantWithAttr(li_node, "span", "data-testid",
+                                                    "track-lockup-subtitle");
 
     if (!title_node || !artist_node)
         return false;
@@ -139,7 +140,7 @@ xmlNodePtr findMatchingListItem(const xmlNodePtr &node, const std::string &title
             }
         }
         if (current->children) {
-            if (const xmlNodePtr found = findMatchingListItem(current->children, title, artist)) {
+            if (xmlNodePtr found = findMatchingListItem(current->children, title, artist)) {
                 return found;
             }
         }
@@ -154,8 +155,9 @@ SearchResult Scraper::searchTrack(const Track &track) {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("scraper")->error("Search for '{} - {}' failed: {}", track.identity.artist,
+                                       track.identity.title, e.what());
         return {};
     }
     curl->setUserAgent();
@@ -166,8 +168,11 @@ SearchResult Scraper::searchTrack(const Track &track) {
 
     htmlDocPtr doc = htmlReadMemory(result.output.c_str(), static_cast<int>(result.output.size()),
                                     nullptr, nullptr, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
-    if (!doc)
+    if (!doc) {
+        logging::get("scraper")->warn("Could not parse the Apple Music page for '{} - {}'",
+                                      track.identity.artist, track.identity.title);
         return {};
+    }
 
     SearchResult r;
     const std::string kTargetSize = "1000x1000bb-60";

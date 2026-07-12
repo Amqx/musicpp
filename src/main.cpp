@@ -11,11 +11,30 @@
 #include "metadata/sources/scraper.hpp"
 #include "metadata/uploaders/imgur.hpp"
 #include "log/log.hpp"
-#include <memory>
-#include <thread>
-#include <discord/rp.hpp>
 
-[[noreturn]] int main() {
+#include <csignal>
+#include <memory>
+#include <discord/rp.hpp>
+#include <windows.h>
+
+std::atomic running{true};
+std::mutex sleep_mutex;
+std::condition_variable sleep_cv;
+
+BOOL WINAPI consoleCtrlHandler(const DWORD ctrlType) {
+    if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT || CTRL_CLOSE_EVENT) {
+        logging::get("")->info("Interrupt received. Shutting down...");
+        running.store(false);
+        sleep_cv.notify_all();
+        return TRUE;
+    }
+    return FALSE;
+}
+
+int main() {
+    if (!SetConsoleCtrlHandler(consoleCtrlHandler, TRUE)) {
+        logging::get("")->warn("Failed to set up signal handler.");
+    }
     logging::init();
     const auto log = logging::get("orchestrator");
 
@@ -31,22 +50,27 @@
         enricher.registerUploader(std::make_unique<Imgur>(imgurId));
     }
 
-    TrackIdentity lastIdentity;
+    EnrichedTrack lastTrack{};
 
-    while (true) {
+    while (running) {
         auto [t, image] = applemusic.poll();
-        const EnrichedTrack enriched = enricher.enrich(t, image);
-        discord.setPresence(enriched);
-
-        if (enriched.track.identity != lastIdentity) {
+        if (t.identity != lastTrack.track.identity) {
+            const EnrichedTrack enriched = enricher.enrich(t, image);
             log->info("track change: '{}' by '{}' ({})", enriched.track.identity.title,
                       enriched.track.identity.artist, enriched.track.identity.album);
-            lastIdentity = enriched.track.identity;
+            lastTrack = enriched;
         }
 
-        SPDLOG_LOGGER_DEBUG(log, "poll: '{}' image={} ({})", enriched.track.identity.title,
-                            enriched.image.url, enriched.image.source);
+        discord.setPresence(lastTrack);
 
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        SPDLOG_LOGGER_DEBUG(log, "poll: '{}' image={} ({})", lastTrack.track.identity.title,
+                            lastTrack.image.url, lastTrack.image.source); {
+            std::unique_lock lock(sleep_mutex);
+            sleep_cv.wait_for(lock, std::chrono::seconds(5), [] {
+                return !running.load();
+            });
+        }
     }
+
+    return 0;
 }

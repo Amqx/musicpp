@@ -99,8 +99,9 @@ bool LastFm::scrobble(const Track &track) const {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("Skipping scrobble of '{} - {}': {}", track.identity.artist,
+                                      track.identity.title, e.what());
         return false;
     }
 
@@ -142,8 +143,8 @@ std::string LastFm::getNewSession(const std::string &token) const {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("auth.getSession failed: {}", e.what());
         return {};
     }
 
@@ -156,9 +157,11 @@ std::string LastFm::getNewSession(const std::string &token) const {
             const std::string session_key = j["session"]["key"];
             return session_key;
         }
+        // Expected while the user has not yet approved the token; polled every 5s.
         return {};
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const Json::exception &e) {
+        // The body carries the session key on success, so it is never logged.
+        logging::get("lastfm")->warn("Malformed auth.getSession response: {}", e.what());
         return {};
     }
 }
@@ -170,8 +173,8 @@ std::string LastFm::requestAuthToken() const {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("auth.getToken failed: {}", e.what());
         return {};
     }
     const auto r = curl->performCall();
@@ -181,12 +184,13 @@ std::string LastFm::requestAuthToken() const {
     try {
         Json j = Json::parse(r.output);
         if (!j.contains("token")) {
+            logging::get("lastfm")->warn("auth.getToken response contained no token");
             return {};
         }
 
         return j["token"].get<std::string>();
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const Json::exception &e) {
+        logging::get("lastfm")->warn("Malformed auth.getToken response: {}", e.what());
         return {};
     }
 }
@@ -204,8 +208,8 @@ bool LastFm::testSessionKey(const std::string &key) const {
     std::unique_ptr<CurlWrapper> curl = nullptr;
     try {
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("Could not validate stored session key: {}", e.what());
         return false;
     }
     const auto r = curl->performCall();
@@ -216,9 +220,12 @@ bool LastFm::testSessionKey(const std::string &key) const {
         if (const Json j = Json::parse(r.output); j.contains("user")) {
             return true;
         }
+        // No "user" object means the stored key was rejected; re-auth is required.
+        logging::get("lastfm")->warn("Stored session key was rejected by user.getInfo");
         return false;
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const Json::exception &e) {
+        // The request is signed with the session key, so the body is never logged.
+        logging::get("lastfm")->warn("Malformed user.getInfo response: {}", e.what());
         return false;
     }
 }
@@ -293,8 +300,9 @@ SearchResult LastFm::searchTrack(const Track &track) {
                                 CurlWrapper::escape(track.identity.artist) + "&limit=" +
                                 kNumSearchResults + "&format=json" + "&api_key=" + _apikey;
         curl = std::make_unique<CurlWrapper>(url);
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const CurlInitError &e) {
+        logging::get("lastfm")->error("Search for '{} - {}' failed: {}", track.identity.artist,
+                                      track.identity.title, e.what());
         return {};
     }
     const auto r = curl->performCall();
@@ -316,9 +324,13 @@ SearchResult LastFm::searchTrack(const Track &track) {
                 return {{}, url};
             }
         }
+        // No result cleared the fuzzy-match threshold
+        logging::get("lastfm")->debug("No match for '{} - {}' among {} result(s)",
+                                      track.identity.artist, track.identity.title, tracks.size());
         return {};
-    } catch (const std::exception &e) {
-        (void)e;
+    } catch (const Json::exception &e) {
+        logging::get("lastfm")->warn("Malformed track.search response for '{} - {}': {}",
+                                     track.identity.artist, track.identity.title, e.what());
         return {};
     }
 }
