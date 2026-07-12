@@ -22,7 +22,7 @@ public:
      * @param uploaders Uploaders tried in order to rehost thumbnail bytes.
      */
     Enricher(MetadataCache &cache,
-             std::vector<std::unique_ptr<MetadataWebSource> > sources,
+             std::vector<std::shared_ptr<MetadataWebSource> > sources,
              std::vector<std::unique_ptr<Uploader> > uploaders);
 
     /**
@@ -31,11 +31,11 @@ public:
      * @param thumbnail Optional raw thumbnail bytes from the poller.
      * @return A fully populated EnrichedTrack (image may be empty on total failure).
      */
-    EnrichedTrack enrich(const Track &track,
-                         const std::optional<std::vector<unsigned char> > &thumbnail) const;
+    [[nodiscard]] EnrichedTrack enrich(const Track &track,
+                                       const std::optional<std::vector<unsigned char> > &thumbnail) const;
 
 private:
     MetadataCache &_cache;
-    std::vector<std::unique_ptr<MetadataWebSource> > _sources;
+    std::vector<std::shared_ptr<MetadataWebSource> > _sources;
     std::vector<std::unique_ptr<Uploader> > _uploaders;
 };

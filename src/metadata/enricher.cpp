@@ -11,7 +11,7 @@
 #include <utility>
 
 Enricher::Enricher(MetadataCache &cache,
-                   std::vector<std::unique_ptr<MetadataWebSource> > sources,
+                   std::vector<std::shared_ptr<MetadataWebSource> > sources,
                    std::vector<std::unique_ptr<Uploader> > uploaders)
     : _cache(cache), _sources(std::move(sources)), _uploaders(std::move(uploaders)) {
 }

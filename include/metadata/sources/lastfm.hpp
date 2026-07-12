@@ -7,9 +7,10 @@
 #pragma once
 
 #include "source.hpp"
+#include "metadata/scrobbler.hpp"
 #include <atomic>
 
-class LastFm : public MetadataWebSource {
+class LastFm : public MetadataWebSource, public Scrobbler {
 public:
     LastFm(const std::string &apikey, const std::string &apiSecret);
 
@@ -28,13 +29,13 @@ public:
      */
     SearchResult searchTrack(const Track &track) override;
 
-    std::string identify() override;
+    [[nodiscard]] std::string identify() override;
 
-    [[nodiscard]] bool authed() const;
+    [[nodiscard]] bool authed() const override;
 
-    bool authenticateUser();
+    [[nodiscard]] bool authenticateUser() override;
 
-    bool scrobble(const Track &track) const;
+    [[nodiscard]] bool scrobble(const Track &track) const override;
 
 private:
     std::string _sessionKey{};

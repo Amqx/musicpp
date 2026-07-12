@@ -21,8 +21,8 @@
     const auto discord = RichPresence(1358389458956976128);
     MetadataCache cache;
 
-    std::vector<std::unique_ptr<MetadataWebSource> > sources;
-    sources.push_back(std::make_unique<Scraper>("ca"));
+    std::vector<std::shared_ptr<MetadataWebSource> > sources;
+    sources.push_back(std::make_shared<Scraper>("ca"));
 
     std::vector<std::unique_ptr<Uploader> > uploaders;
 
