@@ -7,7 +7,7 @@
 #pragma once
 #include "system/poller.hpp"
 
-class AmWin : Poller {
+class AmWin : public Poller {
 public:
     AmWin();
 
