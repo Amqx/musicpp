@@ -11,6 +11,7 @@
 #include "metadata/sources/scraper.hpp"
 #include "metadata/uploaders/imgur.hpp"
 #include "log/log.hpp"
+#include "orchestrator/orchestrator.hpp"
 
 #include <csignal>
 #include <memory>
@@ -36,35 +37,26 @@ int main() {
         logging::get("")->warn("Failed to set up signal handler.");
     }
     logging::init();
-    const auto log = logging::get("orchestrator");
 
-    auto applemusic = AmWin();
-    const auto discord = RichPresence(1358389458956976128);
+    Orchestrator orchestrator{};
+
     MetadataCache cache;
-
-    Enricher enricher(cache);
-    enricher.registerSource(std::make_shared<Scraper>("ca"));
-
+    auto enricher = std::make_unique<Enricher>(cache);
+    enricher->registerSource(std::make_shared<Scraper>("ca"));
     // Redacted
     if (std::string imgurId = ""; !imgurId.empty()) {
-        enricher.registerUploader(std::make_unique<Imgur>(imgurId));
+        enricher->registerUploader(std::make_unique<Imgur>(imgurId));
     }
+    orchestrator.registerEnricher(std::move(enricher));
 
-    EnrichedTrack lastTrack{};
+    auto discord = std::make_unique<RichPresence>(1358389458956976128);
+    orchestrator.registerRichPresence(std::move(discord));
+
+    auto applemusic = std::make_unique<AmWin>();
+    orchestrator.registerPoller(std::move(applemusic));
 
     while (running) {
-        auto [t, image] = applemusic.poll();
-        if (t.identity != lastTrack.track.identity) {
-            const EnrichedTrack enriched = enricher.enrich(t, image);
-            log->info("track change: '{}' by '{}' ({})", enriched.track.identity.title,
-                      enriched.track.identity.artist, enriched.track.identity.album);
-            lastTrack = enriched;
-        }
-
-        discord.setPresence(lastTrack);
-
-        SPDLOG_LOGGER_DEBUG(log, "poll: '{}' image={} ({})", lastTrack.track.identity.title,
-                            lastTrack.image.url, lastTrack.image.source); {
+        orchestrator.run(); {
             std::unique_lock lock(sleep_mutex);
             sleep_cv.wait_for(lock, std::chrono::seconds(5), [] {
                 return !running.load();
