@@ -17,7 +17,7 @@ public:
      * Polls the system for the current track and thumbnail.
      * @return Tuple containing track info and an optional raw thumbnail.
      */
-    virtual std::tuple<Track, std::optional<std::vector<unsigned char>>> poll() = 0;
+    virtual std::tuple<Track, std::optional<std::vector<unsigned char> > > poll() = 0;
 
     /**
      * Identifies the player.

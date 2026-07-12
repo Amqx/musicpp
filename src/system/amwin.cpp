@@ -67,7 +67,7 @@ std::string AmWin::identify() {
 winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession findSession(
     const winrt::Windows::Foundation::Collections::IVectorView<
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession> &sessions) {
-    for (const auto& s : sessions) {
+    for (const auto &s: sessions) {
         if (s.SourceAppUserModelId() == kWindowsIdentifier) {
             return s;
         }
@@ -80,9 +80,10 @@ winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession findSe
  * @param str Conjoined artist and album string.
  * @return Tuple containing artist, then album. If the split fails, both will be equivalent to the input.
  */
-std::tuple<std::wstring, std::wstring> splitArtistAlbum(const std::wstring& str) {
+std::tuple<std::wstring, std::wstring> splitArtistAlbum(const std::wstring &str) {
     const auto sep = str.find(L'\u2014');
-    if (sep == std::wstring::npos) return std::tuple{str, str};
+    if (sep == std::wstring::npos)
+        return std::tuple{str, str};
     return std::tuple{str.substr(0, sep - 1), str.substr(sep + 2)};
 }
 
@@ -91,7 +92,10 @@ std::tuple<std::wstring, std::wstring> splitArtistAlbum(const std::wstring& str)
  * @param timeline Timeline properties object.
  * @return Tuple containing start in ns since unix epoch and end in ns since unix epoch.
  */
-std::tuple<int64_t, int64_t> parseTimeline(const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties &timeline) {
+std::tuple<int64_t, int64_t> parseTimeline(
+    const
+    winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionTimelineProperties &
+    timeline) {
     const auto positionNs = timeline.Position().count() * 100;
     const auto endNs = timeline.EndTime().count() * 100;
 
@@ -107,13 +111,20 @@ std::tuple<int64_t, int64_t> parseTimeline(const winrt::Windows::Media::Control:
  * @param status Windows playback status.
  * @return Matched TrackStatus.
  */
-TrackStatus parseStatus(const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus& status) {
+TrackStatus parseStatus(
+    const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus &
+    status) {
     switch (status) {
-        case winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Stopped:
+        case
+        winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Stopped
+        :
             return Stopped;
-        case winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing:
+        case
+        winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing
+        :
             return Playing;
-        case winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Paused:
+        case
+        winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Paused:
             return Paused;
         default:
             return Unknown;
@@ -125,24 +136,33 @@ TrackStatus parseStatus(const winrt::Windows::Media::Control::GlobalSystemMediaT
  * @param streamRef Stream reference from Windows.
  * @return Vector of bytes containing image data.
  */
-std::vector<unsigned char> parseThumbnail(const winrt::Windows::Storage::Streams::IRandomAccessStreamReference& streamRef) {
-    if (!streamRef) return {};
+std::vector<unsigned char> parseThumbnail(
+    const winrt::Windows::Storage::Streams::IRandomAccessStreamReference &streamRef) {
+    if (!streamRef)
+        return {};
 
-    const winrt::Windows::Storage::Streams::IRandomAccessStreamWithContentType stream = streamRef.OpenReadAsync().get();
+    const winrt::Windows::Storage::Streams::IRandomAccessStreamWithContentType stream = streamRef.
+            OpenReadAsync().get();
     const auto size = static_cast<uint32_t>(stream.Size());
     const winrt::Windows::Storage::Streams::Buffer buf(size);
-    std::ignore = stream.ReadAsync(buf, size, winrt::Windows::Storage::Streams::InputStreamOptions::None).get();
-    unsigned char* data = buf.data();
+    std::ignore = stream.ReadAsync(buf, size,
+                                   winrt::Windows::Storage::Streams::InputStreamOptions::None).
+            get();
+    unsigned char *data = buf.data();
     return {data, data + buf.Length()};
 }
 
-std::tuple<Track, std::optional<std::vector<unsigned char>>> AmWin::poll() {
-    const auto manager = winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
-    if (!manager) return {Track(), std::nullopt};
+std::tuple<Track, std::optional<std::vector<unsigned char> > > AmWin::poll() {
+    const auto manager =
+            winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+            .get();
+    if (!manager)
+        return {Track(), std::nullopt};
 
     const auto sessions = manager.GetSessions();
     const auto am = findSession(sessions);
-    if (!am) return {Track(), std::nullopt};
+    if (!am)
+        return {Track(), std::nullopt};
 
     const auto properties = am.TryGetMediaPropertiesAsync().get();
     const auto timeline = am.GetTimelineProperties();

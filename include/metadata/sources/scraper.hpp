@@ -12,7 +12,7 @@
 
 class Scraper : public MetadataWebSource {
 public:
-    explicit Scraper(const std::string& region);
+    explicit Scraper(const std::string &region);
 
     std::string identify() override;
 

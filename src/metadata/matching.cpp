@@ -43,8 +43,10 @@ int levenshteinDistance(const std::string &s1, const std::string &s2) {
 }
 
 double calculateSimilarity(const std::string &str1, const std::string &str2) {
-    if (str1.empty() && str2.empty()) return 100.0;
-    if (str1.empty() || str2.empty()) return 0.0;
+    if (str1.empty() && str2.empty())
+        return 100.0;
+    if (str1.empty() || str2.empty())
+        return 0.0;
 
     const std::string s1 = toLowerCase(str1);
     const std::string s2 = toLowerCase(str2);

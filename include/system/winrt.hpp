@@ -19,10 +19,13 @@ public:
         static WinRtInit instance;
     }
 
-    WinRtInit(const WinRtInit&) = delete;
-    WinRtInit& operator=(const WinRtInit&) = delete;
-    WinRtInit(WinRtInit&&) = delete;
-    WinRtInit& operator=(WinRtInit&&) = delete;
+    WinRtInit(const WinRtInit &) = delete;
+
+    WinRtInit &operator=(const WinRtInit &) = delete;
+
+    WinRtInit(WinRtInit &&) = delete;
+
+    WinRtInit &operator=(WinRtInit &&) = delete;
 
 private:
     WinRtInit() {

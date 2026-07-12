@@ -18,8 +18,10 @@ public:
 
     TrackIdentity();
 };
-std::ostream& operator<<(std::ostream& os, const TrackIdentity& track);
-bool operator==(const TrackIdentity& l, const TrackIdentity& r);
+
+std::ostream &operator<<(std::ostream &os, const TrackIdentity &track);
+
+bool operator==(const TrackIdentity &l, const TrackIdentity &r);
 
 class TrackTiming {
 public:
@@ -48,17 +50,20 @@ public:
      * @param start_ Start of the track, since unix epoch, in ns.
      * @param end_ End of the track, since unix epoch, in ns.
      */
-    void set(const int64_t& start_, const int64_t& end_);
+    void set(const int64_t &start_, const int64_t &end_);
 
     [[nodiscard]] int64_t start() const;
+
     [[nodiscard]] int64_t end() const;
 
 private:
     std::chrono::time_point<std::chrono::steady_clock> _start;
     std::chrono::time_point<std::chrono::steady_clock> _end;
 };
-std::ostream& operator<<(std::ostream& os, const TrackTiming& timing);
-bool operator==(const TrackTiming& l, const TrackTiming& r);
+
+std::ostream &operator<<(std::ostream &os, const TrackTiming &timing);
+
+bool operator==(const TrackTiming &l, const TrackTiming &r);
 
 enum TrackStatus {
     Playing,
@@ -66,7 +71,8 @@ enum TrackStatus {
     Stopped,
     Unknown
 };
-std::ostream& operator<<(std::ostream& os, const TrackStatus& status);
+
+std::ostream &operator<<(std::ostream &os, const TrackStatus &status);
 
 class Track {
 public:
@@ -74,8 +80,10 @@ public:
     TrackTiming timing;
     TrackStatus status = Unknown;
 };
-std::ostream& operator<<(std::ostream& os, const Track& track);
-bool operator==(const Track& l, const Track& r);
+
+std::ostream &operator<<(std::ostream &os, const Track &track);
+
+bool operator==(const Track &l, const Track &r);
 
 
 enum ImageType : std::uint8_t {
@@ -83,11 +91,14 @@ enum ImageType : std::uint8_t {
     Animated = 1
 };
 
-constexpr std::string to_string(const ImageType& type) {
+constexpr std::string to_string(const ImageType &type) {
     switch (type) {
-        case Static: return "Static";
-        case Animated: return "Animated";
-        default: return "Unknown";
+        case Static:
+            return "Static";
+        case Animated:
+            return "Animated";
+        default:
+            return "Unknown";
     }
 }
 

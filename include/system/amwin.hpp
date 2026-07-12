@@ -10,8 +10,10 @@
 class AmWin : Poller {
 public:
     AmWin();
+
     std::string identify() override;
-    std::tuple<Track, std::optional<std::vector<unsigned char>>> poll() override;
+
+    std::tuple<Track, std::optional<std::vector<unsigned char> > > poll() override;
 
 private:
     const std::string kIdentifier = "Apple Music, Windows";

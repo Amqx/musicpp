@@ -17,10 +17,13 @@ public:
         static DiscordRefresher refresher;
     }
 
-    DiscordRefresher(const DiscordRefresher&) = delete;
-    DiscordRefresher& operator=(const DiscordRefresher&) = delete;
-    DiscordRefresher(DiscordRefresher&&) = delete;
-    DiscordRefresher& operator=(DiscordRefresher&&) = delete;
+    DiscordRefresher(const DiscordRefresher &) = delete;
+
+    DiscordRefresher &operator=(const DiscordRefresher &) = delete;
+
+    DiscordRefresher(DiscordRefresher &&) = delete;
+
+    DiscordRefresher &operator=(DiscordRefresher &&) = delete;
 
 private:
     std::thread loopThread;
@@ -39,10 +42,12 @@ private:
         }
     }
 
-    DiscordRefresher() : loopThread(&DiscordRefresher::loop, this), running(true) {}
+    DiscordRefresher() : loopThread(&DiscordRefresher::loop, this), running(true) {
+    }
 
     ~DiscordRefresher() {
         running.store(false, std::memory_order_relaxed);
-        if (loopThread.joinable()) loopThread.join();
+        if (loopThread.joinable())
+            loopThread.join();
     }
 };

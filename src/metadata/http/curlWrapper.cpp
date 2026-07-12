@@ -33,12 +33,13 @@ std::string CurlWrapper::escape(const std::string &value) {
     return encoded ? std::string(encoded.get()) : std::string();
 }
 
-void CurlWrapper::addMime(const std::vector<unsigned char> &bytes, const std::string& name) {
-    if (mime) curl_mime_free(mime);
+void CurlWrapper::addMime(const std::vector<unsigned char> &bytes, const std::string &name) {
+    if (mime)
+        curl_mime_free(mime);
     mime = curl_mime_init(curl);
     curl_mimepart *part = curl_mime_addpart(mime);
     curl_mime_name(part, name.c_str());
-    curl_mime_data(part, reinterpret_cast<const char*>(bytes.data()), bytes.size());
+    curl_mime_data(part, reinterpret_cast<const char *>(bytes.data()), bytes.size());
     curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
 }
 
@@ -48,8 +49,10 @@ void CurlWrapper::usePost(const std::string &fields) const {
 }
 
 CurlWrapper::~CurlWrapper() {
-    if (headers) curl_slist_free_all(headers);
-    if (mime) curl_mime_free(mime);
+    if (headers)
+        curl_slist_free_all(headers);
+    if (mime)
+        curl_mime_free(mime);
     curl_easy_cleanup(curl);
 }
 
@@ -72,8 +75,10 @@ CurlResult CurlWrapper::performCall() {
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &r.HTTPCode);
 
     if (r.curlcode != CURLE_OK) {
-        if (errbuf[0] != '\0') r.curlErrorString = errbuf;
-        else r.curlErrorString = curl_easy_strerror(r.curlcode);
+        if (errbuf[0] != '\0')
+            r.curlErrorString = errbuf;
+        else
+            r.curlErrorString = curl_easy_strerror(r.curlcode);
     }
 
     return r;

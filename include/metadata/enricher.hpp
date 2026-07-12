@@ -42,7 +42,8 @@ public:
      * @return A fully populated EnrichedTrack (image may be empty on total failure).
      */
     [[nodiscard]] EnrichedTrack enrich(const Track &track,
-                                       const std::optional<std::vector<unsigned char> > &thumbnail) const;
+                                       const std::optional<std::vector<unsigned char> > &thumbnail)
+    const;
 
 private:
     MetadataCache &_cache;
