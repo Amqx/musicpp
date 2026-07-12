@@ -18,12 +18,22 @@ class Enricher {
 public:
     /**
      * @param cache Long-lived metadata cache (not owned).
-     * @param sources Web sources tried in order for image + song urls.
-     * @param uploaders Uploaders tried in order to rehost thumbnail bytes.
      */
-    Enricher(MetadataCache &cache,
-             std::vector<std::shared_ptr<MetadataWebSource> > sources,
-             std::vector<std::unique_ptr<Uploader> > uploaders);
+    explicit Enricher(MetadataCache &cache);
+
+    /**
+     * Registers a web source tried during enrichment for image + song urls.
+     * Sources are tried in registration order.
+     * @param source Shared handle to the source.
+     */
+    void registerSource(std::shared_ptr<MetadataWebSource> source);
+
+    /**
+     * Registers an uploader tried during enrichment to rehost thumbnail bytes.
+     * Uploaders are tried in registration order.
+     * @param uploader Owning handle to the uploader.
+     */
+    void registerUploader(std::unique_ptr<Uploader> uploader);
 
     /**
      * Enriches a track with an image url and per-platform song urls.
@@ -36,6 +46,6 @@ public:
 
 private:
     MetadataCache &_cache;
-    std::vector<std::shared_ptr<MetadataWebSource> > _sources;
-    std::vector<std::unique_ptr<Uploader> > _uploaders;
+    std::vector<std::shared_ptr<MetadataWebSource> > _sources{};
+    std::vector<std::unique_ptr<Uploader> > _uploaders{};
 };

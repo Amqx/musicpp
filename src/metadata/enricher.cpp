@@ -10,10 +10,15 @@
 #include <string>
 #include <utility>
 
-Enricher::Enricher(MetadataCache &cache,
-                   std::vector<std::shared_ptr<MetadataWebSource> > sources,
-                   std::vector<std::unique_ptr<Uploader> > uploaders)
-    : _cache(cache), _sources(std::move(sources)), _uploaders(std::move(uploaders)) {
+Enricher::Enricher(MetadataCache &cache) : _cache(cache) {
+}
+
+void Enricher::registerSource(std::shared_ptr<MetadataWebSource> source) {
+    _sources.push_back(std::move(source));
+}
+
+void Enricher::registerUploader(std::unique_ptr<Uploader> uploader) {
+    _uploaders.push_back(std::move(uploader));
 }
 
 EnrichedTrack Enricher::enrich(const Track &track,

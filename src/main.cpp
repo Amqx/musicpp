@@ -21,17 +21,13 @@
     const auto discord = RichPresence(1358389458956976128);
     MetadataCache cache;
 
-    std::vector<std::shared_ptr<MetadataWebSource> > sources;
-    sources.push_back(std::make_shared<Scraper>("ca"));
-
-    std::vector<std::unique_ptr<Uploader> > uploaders;
+    Enricher enricher(cache);
+    enricher.registerSource(std::make_shared<Scraper>("ca"));
 
     // Redacted
     if (std::string imgurId = ""; !imgurId.empty()) {
-        uploaders.push_back(std::make_unique<Imgur>(imgurId));
+        enricher.registerUploader(std::make_unique<Imgur>(imgurId));
     }
-
-    Enricher enricher(cache, std::move(sources), std::move(uploaders));
 
     while (true) {
         auto [t, image] = applemusic.poll();
