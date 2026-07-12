@@ -8,6 +8,7 @@
 #include "system/amwin.hpp"
 #include "metadata/cache.hpp"
 #include "metadata/enricher.hpp"
+#include "metadata/sources/lastfm.hpp"
 #include "metadata/sources/scraper.hpp"
 #include "metadata/uploaders/imgur.hpp"
 #include "log/log.hpp"
@@ -23,7 +24,8 @@ std::mutex sleep_mutex;
 std::condition_variable sleep_cv;
 
 BOOL WINAPI consoleCtrlHandler(const DWORD ctrlType) {
-    if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT || CTRL_CLOSE_EVENT) {
+    if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT ||
+        ctrlType == CTRL_CLOSE_EVENT) {
         logging::get("")->info("Interrupt received. Shutting down...");
         running.store(false);
         sleep_cv.notify_all();
@@ -38,15 +40,28 @@ int main() {
     }
     logging::init();
 
+    MetadataCache cache;
     Orchestrator orchestrator{};
 
-    MetadataCache cache;
     auto enricher = std::make_unique<Enricher>(cache);
     enricher->registerSource(std::make_shared<Scraper>("ca"));
     // Redacted
     if (std::string imgurId = ""; !imgurId.empty()) {
         enricher->registerUploader(std::make_unique<Imgur>(imgurId));
     }
+
+    // Redacted
+    if (std::string lastfmKey = "", lastfmSecret =
+                "";
+        !lastfmKey.empty() && !lastfmSecret.empty()) {
+        auto lastfm = std::make_shared<LastFm>(lastfmKey, lastfmSecret);
+        if (!lastfm->authed() && !lastfm->authenticateUser()) {
+            logging::get("lastfm")->warn("Authentication failed, scrobbling is disabled");
+        }
+        enricher->registerSource(lastfm);
+        orchestrator.registerScrobbler(std::move(lastfm));
+    }
+
     orchestrator.registerEnricher(std::move(enricher));
 
     auto discord = std::make_unique<RichPresence>(1358389458956976128);
