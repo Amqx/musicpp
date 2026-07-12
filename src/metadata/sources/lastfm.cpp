@@ -8,6 +8,7 @@
 #include "metadata/matching.hpp"
 #include "metadata/http/curlWrapper.hpp"
 #include "security/credentials.hpp"
+#include "log/log.hpp"
 
 #include <iostream>
 #include <thread>
@@ -229,6 +230,8 @@ bool LastFm::authenticateUser() {
         std::cout <<
             "This error is most likely due to an incorrect API key and secret combination.\n";
         std::cout << "LastFm will be disabled.\n";
+        logging::get("lastfm")->warn(
+            "Failed to get auth token (likely bad API key/secret); LastFm disabled");
         return false;
     }
 
@@ -264,6 +267,7 @@ bool LastFm::authenticateUser() {
         timer += 5;
         if (timer >= 300) {
             std::cout << "Authentication timed out after 5 minutes.\n";
+            logging::get("lastfm")->warn("LastFm authentication timed out after 5 minutes");
             cancelled.store(true, std::memory_order::memory_order_relaxed);
             watcher.request_stop();
         }

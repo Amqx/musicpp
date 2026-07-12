@@ -55,6 +55,11 @@ target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsa
 target_include_directories(musicpp PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
 target_compile_definitions(musicpp PRIVATE UNICODE _UNICODE)
 
+# spdlog: strip trace/debug in Release, keep everything otherwise.
+target_compile_definitions(musicpp PRIVATE
+        $<$<CONFIG:Release>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_INFO>
+        $<$<NOT:$<CONFIG:Release>>:SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE>)
+
 # Copy Social SDK shared library to output directory, so it's available at runtime.
 add_custom_command(TARGET musicpp POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different

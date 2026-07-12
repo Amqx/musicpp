@@ -24,5 +24,5 @@ public:
     void setPresence(const EnrichedTrack &track) const;
 
 private:
-    std::unique_ptr<discordpp::Client> _client = std::make_unique<discordpp::Client>();
+    std::shared_ptr<discordpp::Client> _client = std::make_shared<discordpp::Client>();
 };
