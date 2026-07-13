@@ -22,7 +22,8 @@ template<typename Predicate>
 bool waitFor(Predicate done, const std::chrono::milliseconds timeout = 2s) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
-        if (done()) return true;
+        if (done())
+            return true;
         std::this_thread::sleep_for(1ms);
     }
     return done();
@@ -50,9 +51,7 @@ TEST_CASE("A job runs off the calling thread", "[worker]") {
 
 TEST_CASE("Jobs run in the order they were submitted", "[worker]") {
     std::mutex mutex;
-    std::vector<int> order;
-
-    {
+    std::vector<int> order; {
         Worker worker;
         for (int i = 0; i < 16; ++i) {
             worker.submit([&mutex, &order, i] {
@@ -64,13 +63,12 @@ TEST_CASE("Jobs run in the order they were submitted", "[worker]") {
 
     std::lock_guard lock(mutex);
     REQUIRE(order.size() == 16);
-    for (int i = 0; i < 16; ++i) CHECK(order[i] == i);
+    for (int i = 0; i < 16; ++i)
+        CHECK(order[i] == i);
 }
 
 TEST_CASE("The destructor drains a queue that is still full", "[worker]") {
-    std::atomic ran{0};
-
-    {
+    std::atomic ran{0}; {
         Worker worker;
         for (int i = 0; i < 8; ++i) {
             worker.submit([&ran] {
@@ -89,15 +87,14 @@ TEST_CASE("A worker given nothing to do still shuts down", "[worker]") {
 }
 
 TEST_CASE("Jobs submitted from many threads all run", "[worker]") {
-    std::atomic ran{0};
-
-    {
+    std::atomic ran{0}; {
         Worker worker;
         std::vector<std::jthread> submitters;
         submitters.reserve(4);
         for (int t = 0; t < 4; ++t) {
             submitters.emplace_back([&worker, &ran] {
-                for (int i = 0; i < 8; ++i) worker.submit([&ran] { ++ran; });
+                for (int i = 0; i < 8; ++i)
+                    worker.submit([&ran] { ++ran; });
             });
         }
     }

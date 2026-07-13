@@ -9,10 +9,10 @@
 #include "log/log.hpp"
 
 namespace {
-    /**
- * Default runtime log level from build configuration.
- * @return Log level.
- */
+/**
+* Default runtime log level from build configuration.
+* @return Log level.
+*/
 constexpr discordpp::LoggingSeverity defaultLevel() {
 #ifdef NDEBUG
     return discordpp::LoggingSeverity::Info;
@@ -96,11 +96,11 @@ RichPresence::RichPresence(const uint64_t &apikey) {
 }
 
 namespace {
-    /**
- * Makes sure strings passed to the Discord Social SDK are between 2 and 128 characters.
- * @param str Intended input string.
- * @return Sanitized string.
- */
+/**
+* Makes sure strings passed to the Discord Social SDK are between 2 and 128 characters.
+* @param str Intended input string.
+* @return Sanitized string.
+*/
 std::string discordStringBounds(const std::string &str) {
     constexpr int kDiscordMaxStrLen = 128;
     const auto kWhitespace = reinterpret_cast<const char *>(u8"\u2008");

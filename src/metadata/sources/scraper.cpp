@@ -24,7 +24,7 @@ std::string Scraper::identify() {
 }
 
 namespace {
-    std::string getAttribute(const xmlNodePtr &node, const char *attribute) {
+std::string getAttribute(const xmlNodePtr &node, const char *attribute) {
     if (!node)
         return "";
     xmlChar *value = xmlGetProp(node, reinterpret_cast<const xmlChar *>(attribute));

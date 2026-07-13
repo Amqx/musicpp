@@ -47,7 +47,8 @@ Track makeTrack(const std::string &title = "Bohemian Rhapsody",
  */
 class FakeScrobbler final : public Scrobbler {
 public:
-    explicit FakeScrobbler(std::string name) : _name(std::move(name)) {}
+    explicit FakeScrobbler(std::string name) : _name(std::move(name)) {
+    }
 
     bool authed() const override { return isAuthed.load(); }
 
@@ -125,7 +126,8 @@ bool pumpUntil(ScrobbleDriver &driver, const Track &track, Predicate done,
     const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
         driver.tick(track);
-        if (done()) return true;
+        if (done())
+            return true;
         std::this_thread::sleep_for(2ms);
     }
     driver.tick(track);
@@ -352,7 +354,7 @@ TEST_CASE("A play ending mid-flight does not stall the next one", "[scrobbler][r
     REQUIRE(pumpUntil(driver, second, [&] {
         const auto playing = scrobbler->playing();
         return std::ranges::any_of(playing, [&](const TrackIdentity &id) {
-        return id == second.identity;
-        });
+            return id == second.identity;
+            });
         }));
 }

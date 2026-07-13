@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace {
-    std::string toLowerCase(const std::string &str) {
+std::string toLowerCase(const std::string &str) {
     std::string result = str;
     std::ranges::transform(result, result.begin(),
                            [](const unsigned char c) { return tolower(c); });

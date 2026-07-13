@@ -99,8 +99,8 @@ TEST_CASE("merging song urls dedupes and drops empties", "[codec]") {
     const std::vector<SongUrl> existing{{"https://music.apple.com/song/1", "applemusic"}};
     const std::vector<SongUrl> incoming{
         {"https://music.apple.com/song/1", "applemusic"}, // duplicate
-        {"", "lastfm"},                                   // empty url
-        {"https://last.fm/song/1", "lastfm"},             // new
+        {"", "lastfm"}, // empty url
+        {"https://last.fm/song/1", "lastfm"}, // new
     };
 
     const auto merged = cache_codec::mergeSongUrls(existing, incoming);

@@ -19,11 +19,11 @@
 using Json = nlohmann::json;
 
 namespace {
-    /**
- * Computes the MD5 hash of a given input string.
- * @param input Input to hash.
- * @return Hashed output.
- */
+/**
+* Computes the MD5 hash of a given input string.
+* @param input Input to hash.
+* @return Hashed output.
+*/
 std::string Md5(const std::string &input) {
     HCRYPTPROV hProv = 0;
     HCRYPTHASH hHash = 0;

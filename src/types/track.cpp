@@ -36,8 +36,8 @@ TrackTiming::TrackTiming() {
 }
 
 namespace {
-    std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> steadyToSystem(
-        const std::chrono::time_point<std::chrono::steady_clock> &tp) {
+std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> steadyToSystem(
+    const std::chrono::time_point<std::chrono::steady_clock> &tp) {
     const auto steady_now = std::chrono::steady_clock::now();
     const auto system_now = std::chrono::system_clock::now();
     return system_now + (tp - steady_now);

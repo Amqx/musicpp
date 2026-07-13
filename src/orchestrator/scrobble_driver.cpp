@@ -11,7 +11,8 @@
 #include <utility>
 #include <vector>
 
-ScrobbleDriver::ScrobbleDriver(const ScrobbleSchedule schedule) : _schedule(schedule) {}
+ScrobbleDriver::ScrobbleDriver(const ScrobbleSchedule schedule) : _schedule(schedule) {
+}
 
 ScrobbleDriver::~ScrobbleDriver() {
     // Lets an attempt still sitting in the worker's queue bail out instead of making its call.

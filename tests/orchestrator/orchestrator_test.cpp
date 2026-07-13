@@ -82,7 +82,8 @@ class FakePoller final : public Poller {
 public:
     std::tuple<Track, std::optional<std::vector<unsigned char> > > poll() override {
         ++polls;
-        if (script.empty()) return {Track{}, std::nullopt};
+        if (script.empty())
+            return {Track{}, std::nullopt};
         const auto &track = script[std::min(_cycle, script.size() - 1)];
         ++_cycle;
         return {track, thumbnail};
@@ -157,7 +158,8 @@ public:
 
     /// Runs one poll cycle, as main() does every 5 seconds.
     void cycle(const int times = 1) {
-        for (int i = 0; i < times; ++i) orchestrator.run();
+        for (int i = 0; i < times; ++i)
+            orchestrator.run();
     }
 
     Orchestrator orchestrator{};

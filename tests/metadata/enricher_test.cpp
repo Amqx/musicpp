@@ -59,7 +59,8 @@ private:
 class FakeSource final : public MetadataWebSource {
 public:
     FakeSource(std::string name, SearchResult result)
-        : _name(std::move(name)), _result(std::move(result)) {}
+        : _name(std::move(name)), _result(std::move(result)) {
+    }
 
     SearchResult searchTrack(const Track &track) override {
         ++calls;
@@ -83,7 +84,8 @@ private:
 class FakeUploader final : public Uploader {
 public:
     FakeUploader(std::string name, std::string url) : _name(std::move(name)),
-                                                      _url(std::move(url)) {}
+                                                      _url(std::move(url)) {
+    }
 
     UploadResult uploadImage(const std::vector<unsigned char> &bytes, ImageType type) override {
         ++calls;
@@ -181,9 +183,7 @@ TEST_CASE("A cached image is not fetched again", "[enricher][cache]") {
 
 TEST_CASE("What a source finds is persisted for the next enrichment", "[enricher][cache]") {
     const TempDb db;
-    const auto track = makeTrack();
-
-    {
+    const auto track = makeTrack(); {
         MetadataCache cache(db.path());
         Enricher enricher(cache);
         enricher.registerSource(std::make_shared<FakeSource>(
@@ -255,7 +255,8 @@ TEST_CASE("Song urls are collected from every source", "[enricher]") {
     REQUIRE(enriched.songUrls.size() == 2);
 
     std::vector<std::string> sources;
-    for (const auto &url: enriched.songUrls) sources.push_back(url.source);
+    for (const auto &url : enriched.songUrls)
+        sources.push_back(url.source);
     CHECK(std::ranges::find(sources, "apple") != sources.end());
     CHECK(std::ranges::find(sources, "lastfm") != sources.end());
 }
@@ -264,9 +265,7 @@ TEST_CASE("A source is only ever listed once", "[enricher]") {
     // Enriching twice must not append the same link a second time. Only one cache may hold the
     // database at a time, so the first is closed before the second opens.
     const TempDb db;
-    const auto track = makeTrack();
-
-    {
+    const auto track = makeTrack(); {
         MetadataCache cache(db.path());
         Enricher enricher(cache);
         enricher.registerSource(std::make_shared<FakeSource>(

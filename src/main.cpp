@@ -20,7 +20,7 @@
 #include <windows.h>
 
 namespace {
-    std::atomic running{true};
+std::atomic running{true};
 std::mutex sleep_mutex;
 std::condition_variable sleep_cv;
 
