@@ -115,12 +115,15 @@ bool LastFm::scrobble(const Track &track) const {
 
     curl->usePost(body);
     const auto r = curl->performCall();
-    if (r.curlcode != CURLE_OK)
+    if (!r.okOrWarn("lastfm", "track.scrobble for '{} - {}'", track.identity.artist,
+                    track.identity.title))
         return false;
 
     if (r.output.find("lfm status=\"ok\"") != std::string::npos) {
         return true;
     }
+    logging::get("lastfm")->warn("track.scrobble rejected for '{} - {}': {}", track.identity.artist,
+                                 track.identity.title, r.briefBody());
     return false;
 }
 
@@ -156,8 +159,10 @@ std::string LastFm::getNewSession(const std::string &token) const {
         return {};
     }
 
+    // An unapproved token answers 403 on every 5s poll, so only a transport failure is worth
+    // warning about. The success body carries the session key and is never logged.
     const auto r = curl->performCall();
-    if (r.curlcode != CURLE_OK)
+    if (!r.transferredOrWarn("lastfm", "auth.getSession"))
         return {};
     try {
         Json j = Json::parse(r.output);
@@ -186,7 +191,7 @@ std::string LastFm::requestAuthToken() const {
         return {};
     }
     const auto r = curl->performCall();
-    if (r.curlcode != CURLE_OK)
+    if (!r.okOrWarn("lastfm", "auth.getToken"))
         return {};
 
     try {
@@ -221,7 +226,7 @@ bool LastFm::testSessionKey(const std::string &key) const {
         return false;
     }
     const auto r = curl->performCall();
-    if (r.curlcode != CURLE_OK)
+    if (!r.okOrWarn("lastfm", "user.getInfo while validating the stored session key"))
         return false;
 
     try {
@@ -314,7 +319,8 @@ SearchResult LastFm::searchTrack(const Track &track) {
         return {};
     }
     const auto r = curl->performCall();
-    if (r.curlcode != CURLE_OK)
+    if (!r.okOrWarn("lastfm", "track.search for '{} - {}'", track.identity.artist,
+                    track.identity.title))
         return {};
     try {
         Json j = Json::parse(r.output)["results"];
@@ -360,12 +366,13 @@ bool LastFm::setPlaying(const Track &track) const {
     const std::string duration = std::to_string(
         std::chrono::duration_cast<std::chrono::seconds>(track.timing.total()).count());
     const std::string artist = CurlWrapper::escape(track.identity.artist);
-    const std::string album = CurlWrapper::escape(track.identity.album);
+    const std::string album = CurlWrapper::escape(trimAlbumName(track.identity.album));
     const std::string title = CurlWrapper::escape(track.identity.title);
+
     const std::string hash = Md5(
-        "album" + trimAlbumName(album) + "api_key" + _apikey + "artist" + artist + "duration" +
-        duration + "method" + "track.updateNowPlaying" + "sk" + _sessionKey + "track" + title +
-        _apiSecret);
+        "album" + trimAlbumName(track.identity.album) + "api_key" + _apikey + "artist" + track.
+        identity.artist + "duration" + duration + "method" + "track.updateNowPlaying" + "sk" +
+        _sessionKey + "track" + track.identity.title + _apiSecret);
     body += "method=track.updateNowPlaying";
     body += "&api_key=" + _apikey;
     body += "&artist=" + artist;
@@ -387,12 +394,15 @@ bool LastFm::setPlaying(const Track &track) const {
     curl->addHeader("Content-Type: application/x-www-form-urlencoded");
     curl->usePost(body);
     const auto &r = curl->performCall();
-    if (r.curlcode != CURLE_OK) {
+    if (!r.okOrWarn("lastfm", "track.updateNowPlaying for '{} - {}'", track.identity.artist,
+                    track.identity.title))
         return false;
-    }
+
     if (r.output.find("lfm status=\"ok\"") != std::string::npos) {
         logging::get("lastfm")->info("Successfully set new LastFm now playing");
         return true;
     }
+    logging::get("lastfm")->warn("track.updateNowPlaying rejected for '{} - {}': {}",
+                                 track.identity.artist, track.identity.title, r.briefBody());
     return false;
 }

@@ -165,7 +165,8 @@ SearchResult Scraper::searchTrack(const Track &track) {
     }
     curl->setUserAgent();
     const auto result = curl->performCall();
-    if (result.curlcode != CURLE_OK) {
+    if (!result.okOrWarn("scraper", "Search for '{} - {}'", track.identity.artist,
+                         track.identity.title)) {
         return {};
     }
 

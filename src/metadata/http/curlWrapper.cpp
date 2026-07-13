@@ -6,9 +6,63 @@
 
 #include "metadata/http/curlWrapper.hpp"
 
+#include <algorithm>
 #include <memory>
 
 #include "metadata/http/curlGlobal.hpp"
+
+namespace {
+constexpr size_t kMaxLoggedBody = 200;
+}
+
+bool CurlResult::transferred() const {
+    return curlcode == CURLE_OK;
+}
+
+bool CurlResult::httpOk() const {
+    return HTTPCode >= 200 && HTTPCode < 300;
+}
+
+bool CurlResult::ok() const {
+    return transferred() && httpOk();
+}
+
+std::string CurlResult::briefBody() const {
+    if (output.empty())
+        return "<empty body>";
+
+    std::string brief = output.substr(0, kMaxLoggedBody);
+    // Never cut a UTF-8 sequence in half
+    while (!brief.empty() && (static_cast<unsigned char>(brief.back()) & 0xC0) == 0x80)
+        brief.pop_back();
+    if (!brief.empty() && (static_cast<unsigned char>(brief.back()) & 0x80) != 0)
+        brief.pop_back();
+
+    std::ranges::replace(brief, '\n', ' ');
+    std::ranges::replace(brief, '\r', ' ');
+
+    if (output.size() > brief.size())
+        brief += "...";
+    return brief;
+}
+
+bool CurlResult::checkTransfer(const std::string_view &logger,
+                               const std::string &description) const {
+    if (transferred())
+        return true;
+    logging::get(logger)->warn("{} failed: {}", description, curlErrorString);
+    return false;
+}
+
+bool CurlResult::checkResponse(const std::string_view &logger,
+                               const std::string &description) const {
+    if (!checkTransfer(logger, description))
+        return false;
+    if (httpOk())
+        return true;
+    logging::get(logger)->warn("{} returned HTTP {}: {}", description, HTTPCode, briefBody());
+    return false;
+}
 
 CurlWrapper::CurlWrapper(const std::string &endpoint) {
     CurlGlobal::initialize();

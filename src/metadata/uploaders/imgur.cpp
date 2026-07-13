@@ -35,7 +35,8 @@ UploadResult Imgur::uploadImage(const std::vector<unsigned char> &bytes, ImageTy
     curl->addMime(bytes, "image");
     const auto r = curl->performCall();
 
-    if (r.curlcode != CURLE_OK) {
+    // Most often a bad/rate-limited client ID
+    if (!r.okOrWarn("imgur", "Upload of {} byte(s)", bytes.size())) {
         return {};
     }
 
@@ -48,8 +49,7 @@ UploadResult Imgur::uploadImage(const std::vector<unsigned char> &bytes, ImageTy
             return UploadResult{j["data"]["link"]};
         }
 
-        // Most often a bad/rate-limited client ID; the enricher falls back to no image.
-        logger->warn("Imgur rejected the upload (HTTP {})", r.HTTPCode);
+        logger->warn("Imgur rejected the upload: {}", r.briefBody());
         return {};
     } catch (const Json::exception &e) {
         logger->warn("Malformed upload response: {}", e.what());

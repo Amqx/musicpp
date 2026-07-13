@@ -16,8 +16,9 @@
 #include <shlobj.h>
 #include <vector>
 
-constexpr std::array<const char *, 8> kLoggerNames = {
-    "amwin", "enricher", "lastfm", "scraper", "imgur", "discord", "cache", "orchestrator"};
+constexpr std::array<const char *, 9> kLoggerNames = {
+    "amwin", "enricher", "lastfm", "scraper", "imgur", "discord", "cache", "orchestrator",
+    "scrobbler"};
 
 /**
  * Finds %appdata%/musicppv2/logs.

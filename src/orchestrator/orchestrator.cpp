@@ -5,6 +5,7 @@
  */
 
 #include "orchestrator/orchestrator.hpp"
+#include "orchestrator/scrobble_driver.hpp"
 
 #include <chrono>
 #include <utility>
