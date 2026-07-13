@@ -13,6 +13,7 @@ find_package(leveldb CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(LibXml2 CONFIG REQUIRED)
 find_package(PkgConfig REQUIRED)
+find_package(Catch2 CONFIG REQUIRED)
 pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET
         libavdevice
         libavfilter
@@ -66,4 +67,19 @@ add_custom_command(TARGET musicpp POST_BUILD
         "${DISCORD_SHARED_LIB}"
         $<TARGET_FILE_DIR:musicpp>;
 )
+
+# Tests
+enable_testing()
+
+file(GLOB_RECURSE TEST_SOURCES "tests/*.cpp")
+add_executable(musicpp_tests
+        ${TEST_SOURCES}
+        src/metadata/cache.cpp
+        src/metadata/cache_codec.cpp
+        src/types/track.cpp
+)
+
+target_compile_definitions(musicpp_tests PRIVATE
+        -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T UNICODE _UNICODE)
+target_link_libraries(musicpp_tests PRIVATE Catch2::Catch2WithMain leveldb::leveldb Shell32)
 

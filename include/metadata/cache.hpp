@@ -42,5 +42,10 @@ public:
 private:
     void open(const std::filesystem::path &dbPath);
 
+    /**
+     * Deletes every expired or malformed image row.
+     */
+    void sweepExpired() const;
+
     std::unique_ptr<leveldb::DB> _db;
 };
