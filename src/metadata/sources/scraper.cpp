@@ -23,7 +23,8 @@ std::string Scraper::identify() {
     return kIDENTITY;
 }
 
-std::string getAttribute(const xmlNodePtr &node, const char *attribute) {
+namespace {
+    std::string getAttribute(const xmlNodePtr &node, const char *attribute) {
     if (!node)
         return "";
     xmlChar *value = xmlGetProp(node, reinterpret_cast<const xmlChar *>(attribute));
@@ -148,6 +149,8 @@ xmlNodePtr findMatchingListItem(const xmlNodePtr &node, const std::string &title
     return nullptr;
 }
 
+}
+
 SearchResult Scraper::searchTrack(const Track &track) {
     const std::string term = CurlWrapper::escape(
         track.identity.title + " " + track.identity.album + " " + track.identity.artist);
@@ -166,8 +169,11 @@ SearchResult Scraper::searchTrack(const Track &track) {
         return {};
     }
 
-    htmlDocPtr doc = htmlReadMemory(result.output.c_str(), static_cast<int>(result.output.size()),
-                                    nullptr, nullptr, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
+    const std::unique_ptr<xmlDoc, decltype(&xmlFreeDoc)> doc{
+        htmlReadMemory(result.output.c_str(), static_cast<int>(result.output.size()), nullptr,
+                       nullptr, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING),
+        &xmlFreeDoc
+    };
     if (!doc) {
         logging::get("scraper")->warn("Could not parse the Apple Music page for '{} - {}'",
                                       track.identity.artist, track.identity.title);
@@ -177,7 +183,7 @@ SearchResult Scraper::searchTrack(const Track &track) {
     SearchResult r;
     const std::string kTargetSize = "1000x1000bb-60";
 
-    if (xmlNodePtr root = xmlDocGetRootElement(doc)) {
+    if (xmlNodePtr root = xmlDocGetRootElement(doc.get())) {
         if (xmlNodePtr search_root = findDivWithClass(root, "desktop-search-page")) {
             if (xmlNodePtr li_node = findMatchingListItem(search_root, track.identity.title,
                                                           track.identity.artist)) {
@@ -206,6 +212,5 @@ SearchResult Scraper::searchTrack(const Track &track) {
         }
     }
 
-    xmlFreeDoc(doc);
     return r;
 }

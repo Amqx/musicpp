@@ -11,11 +11,9 @@
 #include <windows.h>
 #include "system/winrt.hpp"
 
-const std::wstring kWindowsIdentifier = L"AppleInc.AppleMusicWin_nzyj5cx40ttqa!App";
+namespace {
 
-AmWin::AmWin() {
-    WinRtInit::initialize();
-}
+const std::wstring kWindowsIdentifier = L"AppleInc.AppleMusicWin_nzyj5cx40ttqa!App";
 
 /**
  * Converts a wide string to a normal string using Windows specific APIs.
@@ -53,10 +51,6 @@ std::string convertWideString(const std::wstring &wstr) {
     );
 
     return narrow_str;
-}
-
-std::string AmWin::identify() {
-    return kIdentifier;
 }
 
 /**
@@ -150,6 +144,16 @@ std::vector<unsigned char> parseThumbnail(
             get();
     unsigned char *data = buf.data();
     return {data, data + buf.Length()};
+}
+
+}
+
+AmWin::AmWin() {
+    WinRtInit::initialize();
+}
+
+std::string AmWin::identify() {
+    return kIdentifier;
 }
 
 std::tuple<Track, std::optional<std::vector<unsigned char> > > AmWin::poll() {

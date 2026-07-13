@@ -8,7 +8,7 @@
 
 #include <string>
 
-std::string readCredential(const std::string &target);
+[[nodiscard]] std::string readCredential(const std::string &target);
 
 void writeCredential(const std::string &target, const std::string &secret);
 

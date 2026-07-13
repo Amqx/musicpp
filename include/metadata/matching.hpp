@@ -10,4 +10,4 @@
 
 constexpr double kMatchGenerosity = 60.0; // Minimum similarity percentage (0-100) for a fuzzy match
 
-bool fuzzyMatch(const std::string &a, const std::string &b);
+[[nodiscard]] bool fuzzyMatch(const std::string &a, const std::string &b);

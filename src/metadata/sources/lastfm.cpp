@@ -18,7 +18,8 @@
 
 using Json = nlohmann::json;
 
-/**
+namespace {
+    /**
  * Computes the MD5 hash of a given input string.
  * @param input Input to hash.
  * @return Hashed output.
@@ -67,6 +68,8 @@ std::string trimAlbumName(const std::string &input) {
         }
     }
     return input.substr(0, pos);
+}
+
 }
 
 bool LastFm::scrobble(const Track &track) const {
@@ -378,6 +381,7 @@ bool LastFm::setPlaying(const Track &track) const {
     } catch (const CurlInitError &e) {
         logging::get("lastfm")->error("Set now playing for '{} - {}' failed: {}",
                                       track.identity.artist, track.identity.title, e.what());
+        return false;
     }
 
     curl->addHeader("Content-Type: application/x-www-form-urlencoded");

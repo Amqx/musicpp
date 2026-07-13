@@ -12,7 +12,7 @@ class MetadataWebSource {
 public:
     virtual ~MetadataWebSource() = default;
 
-    virtual SearchResult searchTrack(const Track &track) = 0;
+    [[nodiscard]] virtual SearchResult searchTrack(const Track &track) = 0;
 
     [[nodiscard]] virtual std::string identify() = 0;
 };

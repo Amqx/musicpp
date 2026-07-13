@@ -9,7 +9,8 @@
 #include <algorithm>
 #include <vector>
 
-std::string toLowerCase(const std::string &str) {
+namespace {
+    std::string toLowerCase(const std::string &str) {
     std::string result = str;
     std::ranges::transform(result, result.begin(),
                            [](const unsigned char c) { return tolower(c); });
@@ -55,6 +56,8 @@ double calculateSimilarity(const std::string &str1, const std::string &str2) {
     const double max_len = std::ranges::max(s1.length(), s2.length());
 
     return (max_len - distance) / max_len * 100.0;
+}
+
 }
 
 bool fuzzyMatch(const std::string &a, const std::string &b) {

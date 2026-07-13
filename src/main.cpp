@@ -19,7 +19,8 @@
 #include <discord/rp.hpp>
 #include <windows.h>
 
-std::atomic running{true};
+namespace {
+    std::atomic running{true};
 std::mutex sleep_mutex;
 std::condition_variable sleep_cv;
 
@@ -32,6 +33,8 @@ BOOL WINAPI consoleCtrlHandler(const DWORD ctrlType) {
         return TRUE;
     }
     return FALSE;
+}
+
 }
 
 int main() {

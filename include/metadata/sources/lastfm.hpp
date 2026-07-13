@@ -27,7 +27,7 @@ public:
     /**
      * Searching tracks with LastFm does not require a session key, but does require a valid API key.
      */
-    SearchResult searchTrack(const Track &track) override;
+    [[nodiscard]] SearchResult searchTrack(const Track &track) override;
 
     [[nodiscard]] std::string identify() override;
 
@@ -52,9 +52,9 @@ private:
     const std::string kIDENTITY = "LastFm API";
     const std::string kSESSION_STORAGE_KEY = "amqx_musicppv2_lastfm_apisecret";
 
-    bool testSessionKey(const std::string &key) const;
+    [[nodiscard]] bool testSessionKey(const std::string &key) const;
 
-    std::string requestAuthToken() const;
+    [[nodiscard]] std::string requestAuthToken() const;
 
-    std::string getNewSession(const std::string &token) const;
+    [[nodiscard]] std::string getNewSession(const std::string &token) const;
 };

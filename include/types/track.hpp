@@ -22,7 +22,7 @@ public:
 
 std::ostream &operator<<(std::ostream &os, const TrackIdentity &track);
 
-bool operator==(const TrackIdentity &l, const TrackIdentity &r);
+[[nodiscard]] bool operator==(const TrackIdentity &l, const TrackIdentity &r);
 
 class TrackTiming {
 public:
@@ -64,7 +64,7 @@ private:
 
 std::ostream &operator<<(std::ostream &os, const TrackTiming &timing);
 
-bool operator==(const TrackTiming &l, const TrackTiming &r);
+[[nodiscard]] bool operator==(const TrackTiming &l, const TrackTiming &r);
 
 enum TrackStatus {
     Playing,
@@ -84,7 +84,7 @@ public:
 
 std::ostream &operator<<(std::ostream &os, const Track &track);
 
-bool operator==(const Track &l, const Track &r);
+[[nodiscard]] bool operator==(const Track &l, const Track &r);
 
 
 enum ImageType : std::uint8_t {
@@ -92,7 +92,7 @@ enum ImageType : std::uint8_t {
     Animated = 1
 };
 
-constexpr std::string to_string(const ImageType &type) {
+[[nodiscard]] constexpr std::string to_string(const ImageType &type) {
     switch (type) {
         case Static:
             return "Static";

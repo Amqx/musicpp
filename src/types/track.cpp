@@ -35,11 +35,14 @@ TrackTiming::TrackTiming() {
     _end = std::chrono::time_point<std::chrono::steady_clock>::max();
 }
 
-static std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> steadyToSystem(
-    const std::chrono::time_point<std::chrono::steady_clock> &tp) {
+namespace {
+    std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> steadyToSystem(
+        const std::chrono::time_point<std::chrono::steady_clock> &tp) {
     const auto steady_now = std::chrono::steady_clock::now();
     const auto system_now = std::chrono::system_clock::now();
     return system_now + (tp - steady_now);
+}
+
 }
 
 int64_t TrackTiming::start() const {

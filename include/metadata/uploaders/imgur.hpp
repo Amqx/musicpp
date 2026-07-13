@@ -13,9 +13,10 @@ class Imgur : public Uploader {
 public:
     explicit Imgur(const std::string &apikey);
 
-    std::string identify() override;
+    [[nodiscard]] std::string identify() override;
 
-    UploadResult uploadImage(const std::vector<unsigned char> &bytes, ImageType type) override;
+    [[nodiscard]] UploadResult uploadImage(const std::vector<unsigned char> &bytes,
+                                           ImageType type) override;
 
 private:
     std::string _apikey;

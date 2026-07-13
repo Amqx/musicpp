@@ -27,6 +27,5 @@ void init();
  * @param name Logger name.
  * @return logger.
  */
-std::shared_ptr<spdlog::logger> get(const std::string_view &name);
-
+[[nodiscard]] std::shared_ptr<spdlog::logger> get(const std::string_view &name);
 }

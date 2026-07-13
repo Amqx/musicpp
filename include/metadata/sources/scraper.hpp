@@ -14,9 +14,9 @@ class Scraper : public MetadataWebSource {
 public:
     explicit Scraper(const std::string &region);
 
-    std::string identify() override;
+    [[nodiscard]] std::string identify() override;
 
-    SearchResult searchTrack(const Track &track) override;
+    [[nodiscard]] SearchResult searchTrack(const Track &track) override;
 
 private:
     std::string _region;

@@ -8,7 +8,8 @@
 #include "discord/refresh.hpp"
 #include "log/log.hpp"
 
-/**
+namespace {
+    /**
  * Default runtime log level from build configuration.
  * @return Log level.
  */
@@ -18,6 +19,8 @@ constexpr discordpp::LoggingSeverity defaultLevel() {
 #else
     return discordpp::LoggingSeverity::Verbose;
 #endif
+}
+
 }
 
 RichPresence::RichPresence(const uint64_t &apikey) {
@@ -79,7 +82,7 @@ RichPresence::RichPresence(const uint64_t &apikey) {
             auto message = "Status changed: " + discordpp::Client::StatusToString(status);
             if (error != discordpp::Client::Error::None) {
                 auto m = discordpp::Client::ErrorToString(error);
-                while (!m.empty() && m.back() == '\0' || m.back() == '\r' || m.back() == '\n') {
+                while (!m.empty() && (m.back() == '\0' || m.back() == '\r' || m.back() == '\n')) {
                     m.pop_back();
                 }
                 message += "(" + m + ", " + std::to_string(errorDetails) + ")";
@@ -92,7 +95,8 @@ RichPresence::RichPresence(const uint64_t &apikey) {
     _client->Connect();
 }
 
-/**
+namespace {
+    /**
  * Makes sure strings passed to the Discord Social SDK are between 2 and 128 characters.
  * @param str Intended input string.
  * @return Sanitized string.
@@ -214,6 +218,8 @@ void setButtons(discordpp::Activity &activity, const EnrichedTrack &track) {
         activity.AddButton(button);
         count++;
     }
+}
+
 }
 
 void RichPresence::setPresence(const EnrichedTrack &track) const {

@@ -11,10 +11,11 @@
 #include <leveldb/write_batch.h>
 #include <algorithm>
 
-/**
+namespace {
+    /**
  * Resolves the default cache directory under LocalAppData.
  */
-static std::filesystem::path defaultDbPath() {
+std::filesystem::path defaultDbPath() {
     PWSTR path = nullptr;
     if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
         throw std::exception("Failed to get LocalAppData folder");
@@ -23,37 +24,6 @@ static std::filesystem::path defaultDbPath() {
     CoTaskMemFree(path);
     return base_path / "musicppv2" / "song_db";
 }
-
-MetadataCache::MetadataCache() {
-    open(defaultDbPath());
-}
-
-MetadataCache::MetadataCache(const std::filesystem::path &dbPath) {
-    open(dbPath);
-}
-
-void MetadataCache::open(const std::filesystem::path &dbPath) {
-    std::error_code ec;
-    create_directories(dbPath, ec);
-    if (ec) {
-        const std::string error = "Couldn't create db folder: " + ec.message();
-        throw std::exception(error.c_str());
-    }
-
-    leveldb::DB *temp = nullptr;
-    leveldb::Options options;
-    options.create_if_missing = true;
-
-    if (const leveldb::Status status = leveldb::DB::Open(options, dbPath.string(), &temp); status.
-        ok()) {
-        _db.reset(temp);
-    } else {
-        const std::string error = "Couldn't initialize db: " + status.ToString();
-        throw std::exception(error.c_str());
-    }
-}
-
-MetadataCache::~MetadataCache() = default;
 
 /**
  * Creates a database key for a given base track.
@@ -201,6 +171,39 @@ std::vector<SongUrl> mergeSongUrls(std::vector<SongUrl> existing,
     }
     return existing;
 }
+
+}
+
+MetadataCache::MetadataCache() {
+    open(defaultDbPath());
+}
+
+MetadataCache::MetadataCache(const std::filesystem::path &dbPath) {
+    open(dbPath);
+}
+
+void MetadataCache::open(const std::filesystem::path &dbPath) {
+    std::error_code ec;
+    create_directories(dbPath, ec);
+    if (ec) {
+        const std::string error = "Couldn't create db folder: " + ec.message();
+        throw std::exception(error.c_str());
+    }
+
+    leveldb::DB *temp = nullptr;
+    leveldb::Options options;
+    options.create_if_missing = true;
+
+    if (const leveldb::Status status = leveldb::DB::Open(options, dbPath.string(), &temp); status.
+        ok()) {
+        _db.reset(temp);
+    } else {
+        const std::string error = "Couldn't initialize db: " + status.ToString();
+        throw std::exception(error.c_str());
+    }
+}
+
+MetadataCache::~MetadataCache() = default;
 
 void MetadataCache::writeEntry(const EnrichedTrack &track) const {
     leveldb::WriteBatch batch;
