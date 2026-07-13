@@ -47,14 +47,22 @@ public:
     TrackTiming();
 
     /**
-     * Sets the timing parameters.
-     * @param start_ Start of the track, since unix epoch, in ns.
-     * @param end_ End of the track, since unix epoch, in ns.
+     * Sets the timing parameters. The instants are steady_clock ticks, not wall clock: playback
+     * positions are measured against a clock that cannot jump, and only converted to wall time on
+     * the way out.
+     * @param start_ Start of the track, since the steady_clock epoch, in ns.
+     * @param end_ End of the track, since the steady_clock epoch, in ns.
      */
     void set(const int64_t &start_, const int64_t &end_);
 
+    /**
+     * @return Start of the track as wall time: seconds since the unix epoch.
+     */
     [[nodiscard]] int64_t start() const;
 
+    /**
+     * @return End of the track as wall time: seconds since the unix epoch.
+     */
     [[nodiscard]] int64_t end() const;
 
 private:

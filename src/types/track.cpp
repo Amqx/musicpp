@@ -103,9 +103,12 @@ std::ostream &operator<<(std::ostream &os, const TrackTiming &timing) {
 }
 
 bool operator==(const TrackTiming &l, const TrackTiming &r) {
-    constexpr auto threshold = std::chrono::milliseconds(500);
-    const auto diff_start = std::chrono::nanoseconds(std::abs(l.start() - r.start()));
-    const auto diff_end = std::chrono::nanoseconds(std::abs(l.end() - r.end()));
+    // start() and end() are unix seconds, so a second of slack is the finest tolerance available.
+    // It is also what is wanted: the poller re-derives the timeline every cycle, and the two reads
+    // of the clock behind steadyToSystem can straddle a second boundary.
+    constexpr auto threshold = std::chrono::seconds(1);
+    const auto diff_start = std::chrono::seconds(std::abs(l.start() - r.start()));
+    const auto diff_end = std::chrono::seconds(std::abs(l.end() - r.end()));
     return diff_start <= threshold && diff_end <= threshold;
 }
 

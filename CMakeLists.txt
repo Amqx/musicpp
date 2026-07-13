@@ -74,12 +74,20 @@ enable_testing()
 file(GLOB_RECURSE TEST_SOURCES "tests/*.cpp")
 add_executable(musicpp_tests
         ${TEST_SOURCES}
+        src/log/log.cpp
         src/metadata/cache.cpp
         src/metadata/cache_codec.cpp
+        src/metadata/enricher.cpp
+        src/metadata/matching.cpp
+        src/orchestrator/orchestrator.cpp
+        src/orchestrator/scrobble_driver.cpp
+        src/orchestrator/worker.cpp
         src/types/track.cpp
 )
 
 target_compile_definitions(musicpp_tests PRIVATE
-        -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T UNICODE _UNICODE)
-target_link_libraries(musicpp_tests PRIVATE Catch2::Catch2WithMain leveldb::leveldb Shell32)
+        -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T UNICODE _UNICODE
+        SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
+target_link_libraries(musicpp_tests PRIVATE Catch2::Catch2WithMain leveldb::leveldb Shell32
+        spdlog::spdlog)
 

@@ -30,11 +30,25 @@ constexpr int kNowPlayingAttempts{3};
 constexpr std::chrono::seconds kNowPlayingRetry{5};
 
 /**
+ * When a play's calls fall due, and how a rejected one is followed up. Defaults to the constants
+ * above; tests substitute a faster schedule.
+ */
+struct ScrobbleSchedule {
+    std::chrono::milliseconds scrobbleDelay = kScrobbleDelay;
+    std::chrono::milliseconds scrobbleRetry = kScrobbleRetry;
+    std::chrono::milliseconds nowPlayingRetry = kNowPlayingRetry;
+    int nowPlayingAttempts = kNowPlayingAttempts;
+};
+
+/**
  * Drives every registered scrobbler through the calls one play owes it.
  */
 class ScrobbleDriver {
 public:
-    ScrobbleDriver();
+    /**
+     * @param schedule When the play's calls fall due. Defaults to the production schedule.
+     */
+    explicit ScrobbleDriver(ScrobbleSchedule schedule = {});
 
     ~ScrobbleDriver();
 
@@ -154,6 +168,8 @@ private:
     void submitAttempt(std::size_t target, Attempt kind, const Track &track);
 
     std::shared_ptr<spdlog::logger> _log = logging::get("scrobbler");
+
+    ScrobbleSchedule _schedule{};
 
     std::vector<Target> _targets{};
 

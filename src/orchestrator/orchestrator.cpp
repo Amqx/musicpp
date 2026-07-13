@@ -22,7 +22,7 @@ void Orchestrator::registerPoller(std::unique_ptr<Poller> poller) {
     _poller = std::move(poller);
 }
 
-void Orchestrator::registerRichPresence(std::unique_ptr<RichPresence> discord) {
+void Orchestrator::registerRichPresence(std::unique_ptr<Presence> discord) {
     _discord = std::move(discord);
 }
 

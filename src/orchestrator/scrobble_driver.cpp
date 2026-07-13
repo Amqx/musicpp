@@ -11,7 +11,7 @@
 #include <utility>
 #include <vector>
 
-ScrobbleDriver::ScrobbleDriver() = default;
+ScrobbleDriver::ScrobbleDriver(const ScrobbleSchedule schedule) : _schedule(schedule) {}
 
 ScrobbleDriver::~ScrobbleDriver() {
     // Lets an attempt still sitting in the worker's queue bail out instead of making its call.
@@ -23,7 +23,7 @@ void ScrobbleDriver::registerScrobbler(std::shared_ptr<Scrobbler> scrobbler) {
     _targets.push_back(Target{
         .scrobbler = std::move(scrobbler),
         .nowPlaying = {.nextAttempt = now},
-        .scrobble = {.nextAttempt = now + kScrobbleDelay}
+        .scrobble = {.nextAttempt = now + _schedule.scrobbleDelay}
     });
 }
 
@@ -43,7 +43,7 @@ void ScrobbleDriver::reset() {
     const auto now = std::chrono::steady_clock::now();
     for (auto &target: _targets) {
         target.nowPlaying = Pending{.nextAttempt = now};
-        target.scrobble = Pending{.nextAttempt = now + kScrobbleDelay};
+        target.scrobble = Pending{.nextAttempt = now + _schedule.scrobbleDelay};
     }
 }
 
@@ -85,17 +85,19 @@ void ScrobbleDriver::applyResult(const AttemptResult &result) {
     }
 
     // A rejected scrobble is also the path taken while the track is simply not played far enough.
-    if (result.kind == Attempt::NowPlaying && pending.attempts >= kNowPlayingAttempts) {
+    if (result.kind == Attempt::NowPlaying && pending.attempts >= _schedule.nowPlayingAttempts) {
         pending.phase = Phase::Done;
         _log->warn("Now-playing update for '{}' failed after {} attempts at {}", identity.title,
-                   kNowPlayingAttempts, target.scrobbler->identify());
+                   _schedule.nowPlayingAttempts, target.scrobbler->identify());
         return;
     }
 
-    const auto retry = result.kind == Attempt::NowPlaying ? kNowPlayingRetry : kScrobbleRetry;
+    const auto retry = result.kind == Attempt::NowPlaying
+                           ? _schedule.nowPlayingRetry
+                           : _schedule.scrobbleRetry;
     pending.phase = Phase::Waiting;
     pending.nextAttempt = std::chrono::steady_clock::now() + retry;
-    _log->debug("Rejected {} for '{}' at {}, retrying in {}s", name(result.kind), identity.title,
+    _log->debug("Rejected {} for '{}' at {}, retrying in {}ms", name(result.kind), identity.title,
                 target.scrobbler->identify(), retry.count());
 }
 

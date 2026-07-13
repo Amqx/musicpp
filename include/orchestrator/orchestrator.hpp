@@ -9,7 +9,7 @@
 #include <chrono>
 #include <memory>
 
-#include "discord/rp.hpp"
+#include "discord/presence.hpp"
 #include "log/log.hpp"
 #include "metadata/enricher.hpp"
 #include "metadata/scrobbler.hpp"
@@ -43,7 +43,7 @@ public:
      * Registers a rich presence client the orchestrator drives during the poll loop.
      * @param discord Unique ptr to the Rich Presence client.
      */
-    void registerRichPresence(std::unique_ptr<RichPresence> discord);
+    void registerRichPresence(std::unique_ptr<Presence> discord);
 
     /**
      * Performs a cycle of the orchestrator.
@@ -73,7 +73,7 @@ private:
 
     std::unique_ptr<Enricher> _enricher = nullptr;
     std::unique_ptr<Poller> _poller = nullptr;
-    std::unique_ptr<RichPresence> _discord = nullptr;
+    std::unique_ptr<Presence> _discord = nullptr;
 
     /// Drives the registered scrobblers through the play being presented.
     ScrobbleDriver _scrobbles{};
