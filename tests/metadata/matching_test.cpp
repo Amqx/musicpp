@@ -25,15 +25,44 @@ TEST_CASE("Small differences in spelling still match", "[matching]") {
     CHECK(fuzzyMatch("Queen", "Queen "));
 }
 
-TEST_CASE("A decorated title falls outside the gate", "[matching][known-gap]") {
-    // Documents a limitation rather than an intention. The gate is an edit-distance ratio over the
-    // whole string, so every character a source appends counts against the match: "(Remastered
-    // 2011)" alone drags an otherwise perfect title down to ~49%, under kMatchGenerosity.
-    //
-    // Scraper works around this with a substring check alongside the fuzzy one (scraper.cpp:123).
-    // LastFm has no such fallback (lastfm.cpp:334), so it discards these results outright.
-    CHECK_FALSE(fuzzyMatch("Bohemian Rhapsody", "Bohemian Rhapsody (Remastered 2011)"));
-    CHECK_FALSE(fuzzyMatch("Under Pressure", "Under Pressure - Remastered"));
+TEST_CASE (
+"A decorated title still matches"
+,
+"[matching]"
+)
+ {
+    // A source routinely appends decoration a player omits ("(Remastered 2011)"). An edit-distance
+    // ratio over the whole string counts every appended character against the match, dragging an
+    // otherwise perfect title under kMatchGenerosity. With the substring fallback opted in (floored
+    // so a short needle can't match incidentally), containment matches regardless.
+    CHECK(fuzzyMatch("Bohemian Rhapsody", "Bohemian Rhapsody (Remastered 2011)", true));
+    CHECK(fuzzyMatch("Under Pressure", "Under Pressure - Remastered", true));
+}
+
+TEST_CASE (
+"The substring fallback is opt-in"
+,
+"[matching]"
+)
+ {
+    // The fallback is a title-only concession: on an artist it invites false positives, so a plain
+    // fuzzyMatch (substring off) holds the ratio and rejects containment the same way the old code
+    // did, while a caller that knows it is matching a title can opt back in.
+    CHECK_FALSE(fuzzyMatch("Radiohead", "Radiohead Tribute"));
+    CHECK_FALSE(fuzzyMatch("Queen", "Queen Naija"));
+    CHECK(fuzzyMatch("Radiohead", "Radiohead Tribute", true));
+}
+
+TEST_CASE (
+"A short needle does not match incidentally"
+,
+"[matching]"
+)
+ {
+    // The substring fallback has a length floor: a needle too short to be distinctive must not
+    // pull in an unrelated, much longer string just because it happens to appear inside it — even
+    // when the fallback is opted in.
+    CHECK_FALSE(fuzzyMatch("Go", "Good Riddance (Time of Your Life)", true));
 }
 
 TEST_CASE("Unrelated strings do not match", "[matching]") {
@@ -43,8 +72,9 @@ TEST_CASE("Unrelated strings do not match", "[matching]") {
 }
 
 TEST_CASE("A different track by the same name shape does not match", "[matching]") {
-    // Just past the 60% gate is where the interesting failures live.
-    CHECK_FALSE(fuzzyMatch("Love of My Life", "Life of My Love (Cover)"));
+    // Just past the 60% gate is where the interesting failures live. Neither contains the other, so
+    // it stays rejected even with the substring fallback opted in.
+    CHECK_FALSE(fuzzyMatch("Love of My Life", "Life of My Love (Cover)", true));
 }
 
 TEST_CASE("Matching is symmetric", "[matching]") {

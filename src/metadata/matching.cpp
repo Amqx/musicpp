@@ -43,14 +43,12 @@ int levenshteinDistance(const std::string &s1, const std::string &s2) {
     return dp[len1][len2];
 }
 
-double calculateSimilarity(const std::string &str1, const std::string &str2) {
-    if (str1.empty() && str2.empty())
+// Operates on strings already lowercased by the caller, so the common path lowercases only once.
+double similarityRatio(const std::string &s1, const std::string &s2) {
+    if (s1.empty() && s2.empty())
         return 100.0;
-    if (str1.empty() || str2.empty())
+    if (s1.empty() || s2.empty())
         return 0.0;
-
-    const std::string s1 = toLowerCase(str1);
-    const std::string s2 = toLowerCase(str2);
 
     const double distance = levenshteinDistance(s1, s2);
     const double max_len = std::ranges::max(s1.length(), s2.length());
@@ -58,8 +56,26 @@ double calculateSimilarity(const std::string &str1, const std::string &str2) {
     return (max_len - distance) / max_len * 100.0;
 }
 
+// A source routinely appends decoration a player omits ("Bohemian Rhapsody (Remastered 2011)"),
+// which the whole-string ratio counts entirely against the match. When one string contains the
+// other, treat it as a match — but only past a length floor, so a short needle can't be pulled in.
+constexpr size_t kSubstringFloor = 5;
+
+// Operates on strings already lowercased by the caller.
+bool substringMatch(const std::string &s1, const std::string &s2) {
+    if (s1.length() < kSubstringFloor || s2.length() < kSubstringFloor)
+        return false;
+
+    return s1.find(s2) != std::string::npos || s2.find(s1) != std::string::npos;
 }
 
-bool fuzzyMatch(const std::string &a, const std::string &b) {
-    return calculateSimilarity(a, b) >= kMatchGenerosity;
+}
+
+bool fuzzyMatch(const std::string &a, const std::string &b, const bool allowSubstring) {
+    // Lowercase once here; both the ratio and the substring check work on the lowered forms.
+    const std::string la = toLowerCase(a);
+    const std::string lb = toLowerCase(b);
+
+    return similarityRatio(la, lb) >= kMatchGenerosity ||
+           (allowSubstring && substringMatch(la, lb));
 }

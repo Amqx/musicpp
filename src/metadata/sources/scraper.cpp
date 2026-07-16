@@ -120,14 +120,10 @@ bool trackMatches(const xmlNodePtr &li_node, const std::string &target_title,
     if (found_title.empty() || found_artist.empty())
         return false;
 
-    const bool title_match = fuzzyMatch(found_title, target_title) || found_title.find(
-                                 normalize(target_title)) !=
-                             std::string::npos;
-    const bool artist_match = fuzzyMatch(found_artist, target_artist) || found_artist.find(
-                                  normalize(target_artist)) !=
-                              std::string::npos;
-
-    return title_match && artist_match;
+    // Titles carry source-appended decoration ("… (Remastered)"), so allow a substring match there;
+    // artists don't, so hold them to the ratio to avoid pulling in "X" against "X Tribute".
+    return fuzzyMatch(found_title, target_title, /*allowSubstring=*/true) &&
+           fuzzyMatch(found_artist, target_artist);
 }
 
 xmlNodePtr findMatchingListItem(const xmlNodePtr &node, const std::string &title,

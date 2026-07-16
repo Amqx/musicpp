@@ -331,7 +331,10 @@ SearchResult LastFm::searchTrack(const Track &track) {
             const std::string artist = found.value("artist", "");
             const std::string url = found.value("url", "");
 
-            const auto title_sim = fuzzyMatch(title, track.identity.title);
+            // Titles carry source-appended decoration ("… (Remastered)"), so allow a substring
+            // match there; artists don't, so hold them to the ratio to avoid pulling in "X"
+            // against "X Tribute".
+            const auto title_sim = fuzzyMatch(title, track.identity.title, /*allowSubstring=*/true);
             const auto artist_sim = fuzzyMatch(artist, track.identity.artist);
 
             if (title_sim && artist_sim) {
