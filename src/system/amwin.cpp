@@ -8,50 +8,11 @@
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/windows.foundation.collections.h>
 #include <winrt/Windows.Storage.Streams.h>
-#include <windows.h>
 #include "system/winrt.hpp"
 
 namespace {
 
 const std::wstring kWindowsIdentifier = L"AppleInc.AppleMusicWin_nzyj5cx40ttqa!App";
-
-/**
- * Converts a wide string to a normal string using Windows specific APIs.
- * @param wstr Input wide string.
- * @return Normal std::string.
- */
-std::string convertWideString(const std::wstring &wstr) {
-    if (wstr.empty()) {
-        return "";
-    }
-
-    const int required_size = WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        wstr.data(),
-        static_cast<int>(wstr.length()),
-        nullptr,
-        0,
-        nullptr, nullptr
-    );
-
-    if (required_size <= 0) {
-        return ""; // Conversion error
-    }
-    std::string narrow_str(required_size, '\0');
-
-    WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        wstr.data(),
-        static_cast<int>(wstr.length()),
-        &narrow_str[0],
-        required_size,
-        nullptr, nullptr
-    );
-
-    return narrow_str;
-}
 
 /**
  * Attempts to find a running Apple Music Windows session using its source app user model id.
@@ -74,11 +35,18 @@ winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession findSe
  * @param str Conjoined artist and album string.
  * @return Tuple containing artist, then album. If the split fails, both will be equivalent to the input.
  */
-std::tuple<std::wstring, std::wstring> splitArtistAlbum(const std::wstring &str) {
-    const auto sep = str.find(L'\u2014');
-    if (sep == std::wstring::npos)
-        return std::tuple{str, str};
-    return std::tuple{str.substr(0, sep - 1), str.substr(sep + 2)};
+std::tuple<std::string, std::string> splitArtistAlbum(const winrt::hstring &str) {
+    const std::wstring_view s{str};
+    const auto sep = s.find(L'\u2014');
+    if (sep == std::wstring::npos) {
+        const auto r = winrt::to_string(s);
+        return std::tuple{r, r};
+    }
+    const auto artistEnd = sep > 0 ? sep - 1 : 0;
+    const auto albumStart = sep + 2 < s.size() ? sep + 2 : s.size();
+    const auto artist = winrt::to_string(s.substr(0, artistEnd));
+    const auto album = winrt::to_string(s.substr(albumStart));
+    return std::tuple{artist, album};
 }
 
 /**
@@ -174,11 +142,11 @@ std::tuple<Track, std::optional<std::vector<unsigned char> > > AmWin::poll() {
     const auto rawImg = properties.Thumbnail();
 
     Track t;
+    t.identity.title = winrt::to_string(properties.Title());
 
-    t.identity.title = convertWideString(properties.Title().c_str());
-    const auto [artist, album] = splitArtistAlbum(std::wstring(properties.Artist()));
-    t.identity.artist = convertWideString(artist);
-    t.identity.album = convertWideString(album);
+    const auto [artist, album] = splitArtistAlbum(properties.Artist());
+    t.identity.artist = artist;
+    t.identity.album = album;
 
     const auto [start, end] = parseTimeline(timeline);
     t.timing.set(start, end);
