@@ -26,10 +26,11 @@ int64_t nowNs() {
 }
 
 /**
- * A track that began the given time ago and runs for four minutes.
+ * A track that began the given time ago and runs for the given length (four minutes by default).
  */
 Track makeTrack(const std::string &title = "Bohemian Rhapsody",
-                const std::chrono::seconds playedFor = 0s) {
+                const std::chrono::seconds playedFor = 0s,
+                const std::chrono::seconds length = 4min) {
     Track track;
     track.identity.title = title;
     track.identity.artist = "Queen";
@@ -37,7 +38,7 @@ Track makeTrack(const std::string &title = "Bohemian Rhapsody",
     track.status = Playing;
 
     const auto start = nowNs() - std::chrono::nanoseconds(playedFor).count();
-    track.timing.set(start, start + std::chrono::nanoseconds(4min).count());
+    track.timing.set(start, start + std::chrono::nanoseconds(length).count());
     return track;
 }
 
@@ -109,9 +110,9 @@ private:
 /// A schedule that plays out in milliseconds rather than half a minute.
 ScrobbleSchedule fastSchedule() {
     return ScrobbleSchedule{
-        .scrobbleDelay = 50ms,
         .scrobbleRetry = 20ms,
         .nowPlayingRetry = 20ms,
+        .nowPlayingRefresh = 50ms,
         .nowPlayingAttempts = 3
     };
 }
@@ -120,7 +121,7 @@ ScrobbleSchedule fastSchedule() {
  * Ticks the driver until the condition holds, standing in for the poll loop.
  * @return Whether the condition came true before the timeout.
  */
-template<typename Predicate>
+template <typename Predicate>
 bool pumpUntil(ScrobbleDriver &driver, const Track &track, Predicate done,
                const std::chrono::milliseconds timeout = 3s) {
     const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -162,9 +163,12 @@ TEST_CASE("A new play sends a now-playing update", "[scrobbler]") {
     CHECK(playing.front() == track.identity);
 }
 
-TEST_CASE("An accepted now-playing update is not repeated", "[scrobbler]") {
+TEST_CASE("An accepted now-playing update is not repeated within the refresh interval",
+          "[scrobbler]") {
     auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
-    ScrobbleDriver driver(fastSchedule());
+    auto schedule = fastSchedule();
+    schedule.nowPlayingRefresh = 10s; // Far longer than the pump: no refresh should intrude.
+    ScrobbleDriver driver(schedule);
     driver.registerScrobbler(scrobbler);
 
     const auto track = makeTrack();
@@ -210,18 +214,57 @@ TEST_CASE("A now-playing update gives up after the allowed attempts", "[scrobble
     CHECK(scrobbler->nowPlayings() == static_cast<std::size_t>(schedule.nowPlayingAttempts));
 }
 
-TEST_CASE("A scrobble waits for the delay to elapse", "[scrobbler]") {
+TEST_CASE("A track played past half its length is scrobbled", "[scrobbler]") {
     auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
-    ScrobbleDriver driver(fastSchedule()); // 50ms delay.
+    ScrobbleDriver driver(fastSchedule());
     driver.registerScrobbler(scrobbler);
 
-    const auto track = makeTrack();
+    // A four-minute track, already two minutes in: past the halfway mark, so it qualifies.
+    const auto track = makeTrack("Bohemian Rhapsody", 2min);
     driver.reset();
 
-    pumpFor(driver, track, 20ms);
+    CHECK(pumpUntil(driver, track, [&] { return scrobbler->scrobbles() >= 1; }));
+}
+
+TEST_CASE("A track not played far enough is not scrobbled", "[scrobbler]") {
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule());
+    driver.registerScrobbler(scrobbler);
+
+    // Thirty seconds into a four-minute track: short of both the halfway mark and the 240s cap.
+    const auto track = makeTrack("Bohemian Rhapsody", 30s);
+    driver.reset();
+
+    pumpFor(driver, track, 150ms);
     CHECK(scrobbler->scrobbles() == 0);
+    // The now-playing update does not wait on playback, so it still went out.
+    CHECK(scrobbler->nowPlayings() >= 1);
+}
+
+TEST_CASE("A long track is scrobbled once it passes the play cap", "[scrobbler]") {
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule());
+    driver.registerScrobbler(scrobbler);
+
+    // A ten-minute track: halfway (5 min) is beyond the 240s cap, so the cap is what fires.
+    // Four minutes and a second in, it is past the cap but nowhere near halfway.
+    const auto track = makeTrack("Jazz Odyssey", 4min + 1s, 10min);
+    driver.reset();
 
     CHECK(pumpUntil(driver, track, [&] { return scrobbler->scrobbles() >= 1; }));
+}
+
+TEST_CASE("A track shorter than the minimum length is never scrobbled", "[scrobbler]") {
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule());
+    driver.registerScrobbler(scrobbler);
+
+    // A twenty-second track played almost to its end: past halfway, but under Last.fm's 30s floor.
+    const auto track = makeTrack("Her Majesty", 19s, 20s);
+    driver.reset();
+
+    pumpFor(driver, track, 150ms);
+    CHECK(scrobbler->scrobbles() == 0);
 }
 
 TEST_CASE("An accepted scrobble is not repeated", "[scrobbler]") {
@@ -250,7 +293,8 @@ TEST_CASE("A rejected scrobble is retried", "[scrobbler]") {
     ScrobbleDriver driver(fastSchedule());
     driver.registerScrobbler(scrobbler);
 
-    const auto track = makeTrack();
+    // Two minutes in, so the play has qualified and only the network is holding the scrobble back.
+    const auto track = makeTrack("Bohemian Rhapsody", 2min);
     driver.reset();
 
     REQUIRE(pumpUntil(driver, track, [&] { return scrobbler->scrobbles() >= 3; }));
@@ -288,7 +332,8 @@ TEST_CASE("Every registered scrobbler is driven", "[scrobbler]") {
     driver.registerScrobbler(first);
     driver.registerScrobbler(second);
 
-    const auto track = makeTrack();
+    // Two minutes in, so both are due a scrobble as well as a now-playing update.
+    const auto track = makeTrack("Bohemian Rhapsody", 2min);
     driver.reset();
 
     CHECK(pumpUntil(driver, track, [&] {
@@ -357,4 +402,58 @@ TEST_CASE("A play ending mid-flight does not stall the next one", "[scrobbler][r
             return id == second.identity;
             });
         }));
+}
+
+TEST_CASE("A still-playing track has its now-playing refreshed", "[scrobbler][pause]") {
+    // A now-playing update goes stale on the scrobbler's end; once the refresh interval passes and
+    // the track is still playing, it is re-sent.
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule()); // Refresh interval 50ms.
+    driver.registerScrobbler(scrobbler);
+
+    const auto track = makeTrack();
+    driver.reset();
+    REQUIRE(pumpUntil(driver, track, [&] { return scrobbler->nowPlayings() >= 1; }));
+
+    CHECK(pumpUntil(driver, track, [&] { return scrobbler->nowPlayings() >= 2; }));
+}
+
+TEST_CASE("A play that begins paused sends no now-playing until it resumes", "[scrobbler][pause]") {
+    // The now-playing update means "listening now", so even the initial send is held while paused —
+    // as happens when the user switches tracks without un-pausing. It goes out once playback starts.
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule());
+    driver.registerScrobbler(scrobbler);
+
+    auto track = makeTrack();
+    track.status = Paused;
+    driver.reset();
+
+    pumpFor(driver, track, 150ms);
+    CHECK(scrobbler->nowPlayings() == 0);
+
+    // On resume the now-playing update is finally sent.
+    track.status = Playing;
+    CHECK(pumpUntil(driver, track, [&] { return scrobbler->nowPlayings() >= 1; }));
+}
+
+TEST_CASE("A refresh due while paused is held until the track resumes", "[scrobbler][pause]") {
+    // The now-playing update means "listening now", so a refresh that falls due while paused is not
+    // sent until playback resumes.
+    auto scrobbler = std::make_shared<FakeScrobbler>("lastfm");
+    ScrobbleDriver driver(fastSchedule()); // Refresh interval 50ms.
+    driver.registerScrobbler(scrobbler);
+
+    auto track = makeTrack();
+    driver.reset();
+    REQUIRE(pumpUntil(driver, track, [&] { return scrobbler->nowPlayings() >= 1; }));
+
+    // Paused well past the refresh interval: the update is held back, not re-sent.
+    track.status = Paused;
+    pumpFor(driver, track, 200ms);
+    CHECK(scrobbler->nowPlayings() == 1);
+
+    // On resume it is finally re-sent.
+    track.status = Playing;
+    CHECK(pumpUntil(driver, track, [&] { return scrobbler->nowPlayings() >= 2; }));
 }

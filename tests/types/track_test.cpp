@@ -93,6 +93,13 @@ TEST_CASE("The endpoints span the total length", "[track][timing]") {
     CHECK(near(span, timing.total()));
 }
 
+TEST_CASE("An unset timing reads as a zero-length track at its start", "[track][timing]") {
+    const TrackTiming timing;
+
+    CHECK(timing.current() == 0ns);
+    CHECK(timing.total() == 0ns);
+}
+
 TEST_CASE("Identities compare by every field", "[track][equality]") {
     const auto base = makeIdentity("Bohemian Rhapsody");
 

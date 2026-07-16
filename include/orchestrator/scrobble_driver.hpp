@@ -17,8 +17,12 @@
 #include "orchestrator/worker.hpp"
 #include "types/track.hpp"
 
-/// Wall time after a new play begins before the first scrobble is attempted.
-constexpr std::chrono::seconds kScrobbleDelay{30};
+/// A track must run longer than this to be scrobbled at all (Last.fm's rule).
+constexpr std::chrono::seconds kScrobbleMinLength{30};
+
+/// A play qualifies to be scrobbled once it has been played past this, or past half the track's
+/// length, whichever comes first — measured against playback position, not wall time.
+constexpr std::chrono::seconds kScrobblePlayCap{240};
 
 /// Wall time between scrobble attempts after one was rejected.
 constexpr std::chrono::seconds kScrobbleRetry{30};
@@ -29,14 +33,18 @@ constexpr int kNowPlayingAttempts{3};
 /// Wall time between now-playing attempts after one failed.
 constexpr std::chrono::seconds kNowPlayingRetry{5};
 
+/// Wall time after which a now-playing update is re-sent to keep it from going stale on the
+/// scrobbler's end. A refresh that falls due mid-pause is held until playback resumes.
+constexpr std::chrono::minutes kNowPlayingRefresh{10};
+
 /**
  * When a play's calls fall due, and how a rejected one is followed up. Defaults to the constants
  * above; tests substitute a faster schedule.
  */
 struct ScrobbleSchedule {
-    std::chrono::milliseconds scrobbleDelay = kScrobbleDelay;
     std::chrono::milliseconds scrobbleRetry = kScrobbleRetry;
     std::chrono::milliseconds nowPlayingRetry = kNowPlayingRetry;
+    std::chrono::milliseconds nowPlayingRefresh = kNowPlayingRefresh;
     int nowPlayingAttempts = kNowPlayingAttempts;
 };
 
@@ -48,7 +56,7 @@ public:
     /**
      * @param schedule When the play's calls fall due. Defaults to the production schedule.
      */
-    explicit ScrobbleDriver(ScrobbleSchedule schedule = {});
+    explicit ScrobbleDriver(const ScrobbleSchedule &schedule = {});
 
     ~ScrobbleDriver();
 
@@ -140,6 +148,15 @@ private:
      * @return Name of the attempt kind, for logging.
      */
     [[nodiscard]] static const char *name(Attempt kind);
+
+    /**
+     * Whether a track has been played far enough to be scrobbled, per Last.fm's guideline: longer
+     * than 30s, and played past half its length or past the 240s cap, whichever is sooner. Judged
+     * against playback position, so a paused play stops accruing towards it.
+     * @param track Track playing this cycle.
+     * @return Whether a scrobble is warranted.
+     */
+    [[nodiscard]] static bool scrobbleThresholdMet(const Track &track);
 
     /**
      * Applies every result the worker has posted since the previous cycle.

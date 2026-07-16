@@ -17,8 +17,10 @@ bool operator==(const TrackIdentity &l, const TrackIdentity &r) {
 }
 
 std::chrono::nanoseconds TrackTiming::current() const {
+    using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
     const auto now = std::chrono::steady_clock::now();
-    if (_start > now || _start.time_since_epoch().count() == 0) {
+    if (_start == SteadyPoint::min() || _start > now ||
+        _start.time_since_epoch().count() == 0) {
         return std::chrono::nanoseconds::zero();
     }
     return now - _start;
@@ -74,7 +76,10 @@ std::chrono::nanoseconds TrackTiming::remaining() const {
 }
 
 std::chrono::nanoseconds TrackTiming::total() const {
-    if (_end < _start)
+    using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
+    // A default-constructed timing is {min, max}; subtracting them overflows, so an unset endpoint
+    // is reported as a zero-length (not-yet-known) track rather than a nonsensical span.
+    if (_start == SteadyPoint::min() || _end == SteadyPoint::max() || _end < _start)
         return std::chrono::nanoseconds(0);
     return _end - _start;
 }

@@ -6,12 +6,13 @@
 
 #include "orchestrator/scrobble_driver.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <mutex>
 #include <utility>
 #include <vector>
 
-ScrobbleDriver::ScrobbleDriver(const ScrobbleSchedule schedule) : _schedule(schedule) {
+ScrobbleDriver::ScrobbleDriver(const ScrobbleSchedule &schedule) : _schedule(schedule) {
 }
 
 ScrobbleDriver::~ScrobbleDriver() {
@@ -24,7 +25,7 @@ void ScrobbleDriver::registerScrobbler(std::shared_ptr<Scrobbler> scrobbler) {
     _targets.push_back(Target{
         .scrobbler = std::move(scrobbler),
         .nowPlaying = {.nextAttempt = now},
-        .scrobble = {.nextAttempt = now + _schedule.scrobbleDelay}
+        .scrobble = {.nextAttempt = now}
     });
 }
 
@@ -36,6 +37,15 @@ const char *ScrobbleDriver::name(const Attempt kind) {
     return kind == Attempt::NowPlaying ? "now-playing update" : "scrobble";
 }
 
+bool ScrobbleDriver::scrobbleThresholdMet(const Track &track) {
+    const auto length = track.timing.total();
+    if (length <= kScrobbleMinLength) {
+        return false; // Too short to scrobble, per Last.fm.
+    }
+    const auto threshold = std::min<std::chrono::nanoseconds>(length / 2, kScrobblePlayCap);
+    return track.timing.current() >= threshold;
+}
+
 void ScrobbleDriver::reset() {
     // Retires every attempt made for the play that just ended
     _play.request_stop();
@@ -44,7 +54,7 @@ void ScrobbleDriver::reset() {
     const auto now = std::chrono::steady_clock::now();
     for (auto &target: _targets) {
         target.nowPlaying = Pending{.nextAttempt = now};
-        target.scrobble = Pending{.nextAttempt = now + _schedule.scrobbleDelay};
+        target.scrobble = Pending{.nextAttempt = now};
     }
 }
 
@@ -80,14 +90,21 @@ void ScrobbleDriver::applyResult(const AttemptResult &result) {
 
     if (result.accepted) {
         pending.phase = Phase::Done;
+        // An accepted now-playing update is armed to be re-sent should the track sit paused long
+        // enough for it to go stale; nothing re-arms a scrobble.
+        if (result.kind == Attempt::NowPlaying) {
+            pending.nextAttempt = std::chrono::steady_clock::now() +
+                                  _schedule.nowPlayingRefresh;
+        }
         _log->info("Accepted {} for '{}' by '{}' at {}", name(result.kind), identity.title,
                    identity.artist, target.scrobbler->identify());
         return;
     }
 
-    // A rejected scrobble is also the path taken while the track is simply not played far enough.
     if (result.kind == Attempt::NowPlaying && pending.attempts >= _schedule.nowPlayingAttempts) {
         pending.phase = Phase::Done;
+        // Given up on, so it is never re-sent, not even after a pause.
+        pending.nextAttempt = std::chrono::steady_clock::time_point::max();
         _log->warn("Now-playing update for '{}' failed after {} attempts at {}", identity.title,
                    _schedule.nowPlayingAttempts, target.scrobbler->identify());
         return;
@@ -111,7 +128,28 @@ void ScrobbleDriver::driveAttempts(const Track &current) {
         }
         for (const auto kind: {Attempt::NowPlaying, Attempt::Scrobble}) {
             auto &pending = slotFor(target, kind);
+
+            // A now-playing update goes stale on the scrobbler's end after the refresh interval.
+            // Re-send it once that has passed, but only while the track is actually playing: a
+            // refresh falling due mid-pause is held until playback resumes.
+            if (kind == Attempt::NowPlaying && pending.phase == Phase::Done &&
+                current.status == Playing && now >= pending.nextAttempt) {
+                pending.phase = Phase::Waiting;
+                pending.attempts = 0;
+            }
+
             if (pending.phase != Phase::Waiting || now < pending.nextAttempt) {
+                continue;
+            }
+            // A scrobble waits on playback, not the clock: the track must have been played far
+            // enough to warrant it.
+            if (kind == Attempt::Scrobble && !scrobbleThresholdMet(current)) {
+                continue;
+            }
+            // A now-playing update announces the track as being listened to right now, so it is held
+            // while paused — the initial send just as much as the refresh guarded above. A play that
+            // begins paused stays silent until it resumes.
+            if (kind == Attempt::NowPlaying && current.status != Playing) {
                 continue;
             }
             pending.phase = Phase::InFlight;
