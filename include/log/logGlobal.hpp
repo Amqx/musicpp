@@ -13,8 +13,8 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #endif
 #include <filesystem>
-#include <shlobj.h>
 #include <vector>
+#include "system/paths.hpp"
 
 constexpr std::array<const char *, 9> kLoggerNames = {
     "amwin", "enricher", "lastfm", "scraper", "imgur", "discord", "cache", "orchestrator",
@@ -25,13 +25,7 @@ constexpr std::array<const char *, 9> kLoggerNames = {
  * @return Path to logging dir.
  */
 inline std::filesystem::path defaultLogDir() {
-    PWSTR path = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
-        throw std::runtime_error("Failed to get LocalAppData folder");
-    }
-    const std::filesystem::path base(path);
-    CoTaskMemFree(path);
-    return base / "musicppv2" / "logs";
+    return paths::appDataDir() / "logs";
 }
 
 /**

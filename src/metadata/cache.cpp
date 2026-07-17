@@ -7,7 +7,7 @@
 #include "metadata/cache.hpp"
 #include "metadata/cache_codec.hpp"
 #include <filesystem>
-#include "shlobj_core.h"
+#include "system/paths.hpp"
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 
@@ -16,13 +16,7 @@ namespace {
  * Resolves the default cache directory under LocalAppData.
  */
 std::filesystem::path defaultDbPath() {
-    PWSTR path = nullptr;
-    if (FAILED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
-        throw std::exception("Failed to get LocalAppData folder");
-    }
-    const std::filesystem::path base_path(path);
-    CoTaskMemFree(path);
-    return base_path / "musicppv2" / "song_db";
+    return paths::appDataDir() / "song_db";
 }
 
 }
