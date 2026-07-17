@@ -5,8 +5,7 @@
  */
 
 /**
- * This class creates a singleton object that makes sure WinRT is initialized before Apple Music Windows pollers
- * can utilize its functions. This makes sure init_apartment() and uninit_apartment() always gets called once.
+ * This class makes sure WinRT is initialized before anything uses it.
  */
 
 #pragma once
@@ -16,7 +15,7 @@
 class WinRtInit final {
 public:
     static void initialize() {
-        static WinRtInit instance;
+        static thread_local WinRtInit instance;
     }
 
     WinRtInit(const WinRtInit &) = delete;

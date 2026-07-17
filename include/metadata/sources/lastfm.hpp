@@ -52,9 +52,19 @@ private:
     const std::string kIDENTITY = "LastFm API";
     const std::string kSESSION_STORAGE_KEY = "amqx_musicppv2_lastfm_apisecret";
 
-    [[nodiscard]] bool testSessionKey(const std::string &key) const;
+    /// What auth.getSession hands back
+    struct Session {
+        std::string key{};
+        std::string name{};
+    };
+
+    /**
+     * Validates a session key against user.getInfo.
+     * @return The username the key belongs to, or an empty string if it was rejected.
+     */
+    [[nodiscard]] std::string testSessionKey(const std::string &key) const;
 
     [[nodiscard]] std::string requestAuthToken() const;
 
-    [[nodiscard]] std::string getNewSession(const std::string &token) const;
+    [[nodiscard]] Session getNewSession(const std::string &token) const;
 };

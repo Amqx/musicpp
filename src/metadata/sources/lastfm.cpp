@@ -9,10 +9,13 @@
 #include "metadata/http/curlWrapper.hpp"
 #include "security/credentials.hpp"
 #include "log/log.hpp"
+#include "system/winrt.hpp"
 
 #include <iostream>
 #include <thread>
-#include <wincrypt.h>
+#include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.Security.Cryptography.h>
+#include <winrt/Windows.Security.Cryptography.Core.h>
 #include <nlohmann/json.hpp>
 #include <conio.h>
 
@@ -25,33 +28,26 @@ namespace {
 * @return Hashed output.
 */
 std::string Md5(const std::string &input) {
-    HCRYPTPROV hProv = 0;
-    HCRYPTHASH hHash = 0;
-    BYTE digest[16] = {};
-    DWORD digest_len = 16;
+    WinRtInit::initialize();
+    namespace crypto = winrt::Windows::Security::Cryptography;
+    try {
+        // Held per thread
+        static thread_local const auto provider =
+            crypto::Core::HashAlgorithmProvider::OpenAlgorithm(
+                crypto::Core::HashAlgorithmNames::Md5());
 
-    if (!CryptAcquireContext(&hProv, nullptr, nullptr, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT))
-        return "";
-    if (!CryptCreateHash(hProv, CALG_MD5, 0, 0, &hHash)) {
-        CryptReleaseContext(hProv, 0);
-        return "";
+        const auto *inBytes = reinterpret_cast<const uint8_t *>(input.data());
+        const auto inBuffer = crypto::CryptographicBuffer::CreateFromByteArray(
+            {inBytes, inBytes + input.size()});
+        const auto outBuffer = provider.HashData(inBuffer);
+        return winrt::to_string(crypto::CryptographicBuffer::EncodeToHexString(outBuffer));
+    } catch (const winrt::hresult_error &e) {
+        logging::get("lastfm")->error("MD5 hashing failed: {}", winrt::to_string(e.message()));
+        return {};
+    } catch (...) {
+        logging::get("lastfm")->error("MD5 hashing failed with an unknown error");
+        return {};
     }
-
-    CryptHashData(hHash, reinterpret_cast<const BYTE *>(input.data()), input.size(), 0);
-    CryptGetHashParam(hHash, HP_HASHVAL, digest, &digest_len, 0);
-    CryptDestroyHash(hHash);
-    CryptReleaseContext(hProv, 0);
-
-    static constexpr char hex[] = "0123456789abcdef";
-    std::string out;
-    out.reserve(32);
-
-    for (const unsigned char b : digest) {
-        out.push_back(hex[b >> 4]);
-        out.push_back(hex[b & 0x0F]);
-    }
-
-    return out;
 }
 
 /**
@@ -92,6 +88,11 @@ bool LastFm::scrobble(const Track &track) const {
         "album" + trimAlbumName(track.identity.album) + "api_key" + _apikey + "artist" + track.
         identity.artist + "method" + "track.scrobble" + "sk" + _sessionKey + "timestamp" + timestamp
         + "track" + track.identity.title + _apiSecret);
+    if (hash.empty()) {
+        logging::get("lastfm")->error("Skipping scrobble of '{} - {}': could not sign the request",
+                                      track.identity.artist, track.identity.title);
+        return false;
+    }
 
     body += "method=track.scrobble";
     body += "&api_key=" + _apikey;
@@ -133,16 +134,19 @@ LastFm::LastFm(const std::string &apikey, const std::string &apiSecret) {
     _apikey = apikey;
     _apiSecret = apiSecret;
 
-    if (sessionKey.empty() || !testSessionKey(sessionKey) || apikey.empty() || apiSecret.empty()) {
-        _authenticated.store(false, std::memory_order::memory_order_relaxed);
-        return;
+    if (!sessionKey.empty() && !apikey.empty() && !apiSecret.empty()) {
+        if (const auto user = testSessionKey(sessionKey); !user.empty()) {
+            logging::get("lastfm")->info(
+                "authenticated with last.fm as {} using previous session key", user);
+            _authenticated.store(true, std::memory_order::memory_order_relaxed);
+            _sessionKey = sessionKey;
+            return;
+        }
     }
-
-    _authenticated.store(true, std::memory_order::memory_order_relaxed);
-    _sessionKey = sessionKey;
+    _authenticated.store(false, std::memory_order::memory_order_relaxed);
 }
 
-std::string LastFm::getNewSession(const std::string &token) const {
+LastFm::Session LastFm::getNewSession(const std::string &token) const {
     std::string url = "https://ws.audioscrobbler.com/2.0/?method=auth.getSession&api_key=" + _apikey
                       + "&token=" + token;
     const std::string hash = Md5(
@@ -167,8 +171,12 @@ std::string LastFm::getNewSession(const std::string &token) const {
     try {
         Json j = Json::parse(r.output);
         if (j.contains("session") && j["session"].contains("key")) {
-            const std::string session_key = j["session"]["key"];
-            return session_key;
+            Session session;
+            session.key = j["session"]["key"].get<std::string>();
+            // The response already names the user, so no user.getInfo call is needed.
+            if (j["session"].contains("name"))
+                session.name = j["session"]["name"].get<std::string>();
+            return session;
         }
         // Expected while the user has not yet approved the token; polled every 5s.
         return {};
@@ -208,13 +216,13 @@ std::string LastFm::requestAuthToken() const {
     }
 }
 
-bool LastFm::testSessionKey(const std::string &key) const {
+std::string LastFm::testSessionKey(const std::string &key) const {
     std::string url = "https://ws.audioscrobbler.com/2.0/?method=user.getInfo&api_key=" + _apikey +
                       "&sk=" + key;
     const std::string hash = Md5(
         "api_key" + _apikey + "method" + "user.getInfo" + "sk" + key + _apiSecret);
     if (hash.empty()) {
-        return false;
+        return {};
     }
     url += "&api_sig=" + hash + "&format=json";
 
@@ -223,27 +231,31 @@ bool LastFm::testSessionKey(const std::string &key) const {
         curl = std::make_unique<CurlWrapper>(url);
     } catch (const CurlInitError &e) {
         logging::get("lastfm")->error("Could not validate stored session key: {}", e.what());
-        return false;
+        return {};
     }
     const auto r = curl->performCall();
     if (!r.okOrWarn("lastfm", "user.getInfo while validating the stored session key"))
-        return false;
+        return {};
 
     try {
         if (const Json j = Json::parse(r.output); j.contains("user")) {
-            return true;
+            return j.at("user").at("name").get<std::string>();
         }
         // No "user" object means the stored key was rejected; re-auth is required.
         logging::get("lastfm")->warn("Stored session key was rejected by user.getInfo");
-        return false;
+        return {};
     } catch (const Json::exception &e) {
         // The request is signed with the session key, so the body is never logged.
         logging::get("lastfm")->warn("Malformed user.getInfo response: {}", e.what());
-        return false;
+        return {};
     }
 }
 
 bool LastFm::authenticateUser() {
+    if (_apikey.empty() || _apiSecret.empty()) {
+        std::cout << "LastFm apikey or apisecret is empty, not attempting auth.\n";
+        return false;
+    }
     const auto token = requestAuthToken();
     if (token.empty()) {
         std::cout << "Failed to get a LastFm auth token!\n";
@@ -259,7 +271,7 @@ bool LastFm::authenticateUser() {
                                  token;
     std::cout << "Go to the following link to login with LastFm:\n";
     std::cout << "\033[34m\x1b]8;;" + auth_url + "\x1b\\" + auth_url + "\x1b]8;;\x1b\\\x1b[0m\n";
-    std::cout << "MusicPP will check for success every 5 seconds. Press `Esc` to cancel.";
+    std::cout << "MusicPP will check for success every 5 seconds. Press `Esc` to cancel.\n";
 
     time_t timer = 0;
     std::atomic cancelled{false};
@@ -276,11 +288,12 @@ bool LastFm::authenticateUser() {
     });
 
     while (!cancelled) {
-        const auto key = getNewSession(token);
-        if (!key.empty()) {
+        if (const auto session = getNewSession(token); !session.key.empty()) {
             watcher.request_stop();
-            _sessionKey = key;
+            _sessionKey = session.key;
             _authenticated.store(true, std::memory_order::memory_order_relaxed);
+            std::cout << "Successfully logged in"
+                << (session.name.empty() ? std::string{} : " as " + session.name) << ".\n";
             return true;
         }
         std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -376,6 +389,13 @@ bool LastFm::setPlaying(const Track &track) const {
         "album" + trimAlbumName(track.identity.album) + "api_key" + _apikey + "artist" + track.
         identity.artist + "duration" + duration + "method" + "track.updateNowPlaying" + "sk" +
         _sessionKey + "track" + track.identity.title + _apiSecret);
+    if (hash.empty()) {
+        logging::get("lastfm")->error(
+            "Skipping now-playing update for '{} - {}': could not sign the request",
+            track.identity.artist, track.identity.title);
+        return false;
+    }
+
     body += "method=track.updateNowPlaying";
     body += "&api_key=" + _apikey;
     body += "&artist=" + artist;
