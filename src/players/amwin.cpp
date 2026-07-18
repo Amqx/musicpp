@@ -143,6 +143,8 @@ std::tuple<Track, std::optional<std::vector<unsigned char> > > AmWin::poll() {
 
     Track t;
     t.identity.title = winrt::to_string(properties.Title());
+    if (t.identity.title.ends_with("'s Station"))
+        return {};
 
     const auto [artist, album] = splitArtistAlbum(properties.Artist());
     t.identity.artist = artist;
