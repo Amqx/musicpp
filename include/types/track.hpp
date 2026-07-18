@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include <fmt/ostream.h>
 #include <string>
 #include <chrono>
 #include <optional>
@@ -20,6 +21,10 @@ public:
     TrackIdentity();
 
     friend auto operator<=>(const TrackIdentity &, const TrackIdentity &) = default;
+};
+
+template <>
+struct fmt::formatter<TrackIdentity> : ostream_formatter {
 };
 
 std::ostream &operator<<(std::ostream &os, const TrackIdentity &track);
@@ -70,6 +75,10 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> _end;
 };
 
+template <>
+struct fmt::formatter<TrackTiming> : ostream_formatter {
+};
+
 std::ostream &operator<<(std::ostream &os, const TrackTiming &timing);
 
 [[nodiscard]] bool operator==(const TrackTiming &l, const TrackTiming &r);
@@ -81,6 +90,10 @@ enum TrackStatus {
     Unknown
 };
 
+template <>
+struct fmt::formatter<TrackStatus> : ostream_formatter {
+};
+
 std::ostream &operator<<(std::ostream &os, const TrackStatus &status);
 
 class Track {
@@ -88,6 +101,10 @@ public:
     TrackIdentity identity;
     TrackTiming timing;
     TrackStatus status = Unknown;
+};
+
+template <>
+struct fmt::formatter<Track> : ostream_formatter {
 };
 
 std::ostream &operator<<(std::ostream &os, const Track &track);
@@ -111,6 +128,10 @@ enum ImageType : std::uint8_t {
     }
 }
 
+template <>
+struct fmt::formatter<ImageType> : ostream_formatter {
+};
+
 std::ostream &operator<<(std::ostream &os, const ImageType &type);
 
 class ImageUrl {
@@ -122,6 +143,10 @@ public:
     friend auto operator<=>(const ImageUrl &, const ImageUrl &) = default;
 };
 
+template <>
+struct fmt::formatter<ImageUrl> : ostream_formatter {
+};
+
 std::ostream &operator<<(std::ostream &os, const ImageUrl &image);
 
 class SongUrl {
@@ -130,6 +155,10 @@ public:
     std::string source;
 
     friend auto operator<=>(const SongUrl &, const SongUrl &) = default;
+};
+
+template <>
+struct fmt::formatter<SongUrl> : fmt::ostream_formatter {
 };
 
 std::ostream &operator<<(std::ostream &os, const SongUrl &song);
@@ -144,6 +173,10 @@ public:
     friend auto operator<=>(const PauseDetails &, const PauseDetails &) = default;
 };
 
+template <>
+struct fmt::formatter<PauseDetails> : ostream_formatter {
+};
+
 std::ostream &operator<<(std::ostream &os, const PauseDetails &pause);
 
 class EnrichedTrack {
@@ -154,6 +187,10 @@ public:
     PauseDetails pause;
 
     friend bool operator==(const EnrichedTrack &, const EnrichedTrack &) = default;
+};
+
+template <>
+struct fmt::formatter<EnrichedTrack> : ostream_formatter {
 };
 
 std::ostream &operator<<(std::ostream &os, const EnrichedTrack &track);
