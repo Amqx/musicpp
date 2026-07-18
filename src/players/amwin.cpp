@@ -4,7 +4,7 @@
  * @date 21-Jun-26
  */
 
-#include "system/amwin.hpp"
+#include "players/amwin.hpp"
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/windows.foundation.collections.h>
 #include <winrt/Windows.Storage.Streams.h>

@@ -14,7 +14,7 @@
 #include "metadata/enricher.hpp"
 #include "metadata/scrobbler.hpp"
 #include "orchestrator/scrobble_driver.hpp"
-#include "system/poller.hpp"
+#include "players/poller.hpp"
 
 /// A backwards jump in playback position larger than this counts as a new play of the same track.
 constexpr std::chrono::seconds kRestartThreshold{30};

@@ -18,7 +18,7 @@
 #include "metadata/enricher.hpp"
 #include "metadata/sources/source.hpp"
 #include "orchestrator/orchestrator.hpp"
-#include "system/poller.hpp"
+#include "players/poller.hpp"
 #include "types/track.hpp"
 
 using namespace std::chrono_literals;

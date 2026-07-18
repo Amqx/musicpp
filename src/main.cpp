@@ -5,7 +5,7 @@
  */
 
 #include "types/track.hpp"
-#include "system/amwin.hpp"
+#include "players/amwin.hpp"
 #include "metadata/cache.hpp"
 #include "metadata/enricher.hpp"
 #include "metadata/sources/lastfm.hpp"
