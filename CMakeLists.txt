@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 4.2)
 
 project(musicpp)
 
+enable_language(RC) # for the embedded tray icon
+
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -41,12 +43,13 @@ set(DISCORD_SDK_INCLUDE_DIR "${DISCORD_SDK_ROOT}/include")
 include_directories(include)
 include_directories(discordsdk)
 
-#include_directories(resources)
-#set(RESOURCE_FILE src/resource.rc)
+include_directories(resources) # resource.h and app-icon.ico for the RC compiler
+set(RESOURCE_FILE src/resource.rc)
 
 file(GLOB_RECURSE SOURCES "src/*.cpp")
-add_executable(musicpp
+add_executable(musicpp WIN32
         ${SOURCES}
+        ${RESOURCE_FILE}
 )
 
 target_compile_definitions(musicpp PRIVATE -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T)

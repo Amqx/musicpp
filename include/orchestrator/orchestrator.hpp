@@ -50,6 +50,13 @@ public:
      */
     void run();
 
+    /**
+     * The enriched track currently being presented.
+     * @return A copy of the current enriched track; its identity title is empty when nothing
+     *         is playing.
+     */
+    [[nodiscard]] EnrichedTrack nowPlaying() const;
+
 private:
     /**
      * Whether a polled track is the current one started over.

@@ -20,6 +20,9 @@
 #include <discord/rp.hpp>
 #include <windows.h>
 
+#include <thread>
+#include "ui/tray.hpp"
+
 // For debug/ dev builds using environment variables for setup
 #include <filesystem>
 #include <fstream>
@@ -29,12 +32,23 @@ std::atomic running{true};
 std::mutex sleep_mutex;
 std::condition_variable sleep_cv;
 
+std::shared_ptr<Tray> g_tray = nullptr;
+std::mutex g_tray_mutex;
+
 BOOL WINAPI consoleCtrlHandler(const DWORD ctrlType) {
     if (ctrlType == CTRL_C_EVENT || ctrlType == CTRL_BREAK_EVENT ||
         ctrlType == CTRL_CLOSE_EVENT) {
-        logging::get("")->info("Interrupt received. Shutting down...");
+        logging::get("main")->info("Interrupt received. Shutting down...");
         running.store(false);
         sleep_cv.notify_all();
+        std::shared_ptr<Tray> local_tray;
+        {
+            std::lock_guard lock(g_tray_mutex);
+            local_tray = g_tray;
+        }
+        if (local_tray) {
+            local_tray -> requestQuit();
+        }
         return TRUE;
     }
     return FALSE;
@@ -97,10 +111,19 @@ std::string apiKey(const std::string &name) {
 
 }
 
-int main() {
-    if (!SetConsoleCtrlHandler(consoleCtrlHandler, TRUE)) {
-        logging::get("")->warn("Failed to set up signal handler.");
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+#ifndef NDEBUG
+    // Debug builds keep the streaming console the log's console sink writes to.
+    if (AllocConsole()) {
+        FILE *f = nullptr;
+        freopen_s(&f, "CONOUT$", "w", stdout);
+        freopen_s(&f, "CONOUT$", "w", stderr);
+        freopen_s(&f, "CONIN$", "r", stdin);
     }
+    if (!SetConsoleCtrlHandler(consoleCtrlHandler, TRUE)) {
+        logging::get("main")->warn("Failed to set up signal handler.");
+    }
+#endif
     logging::init();
 
     MetadataCache cache;
@@ -130,14 +153,40 @@ int main() {
     auto applemusic = std::make_unique<AmWin>();
     orchestrator.registerPoller(std::move(applemusic));
 
-    while (running) {
-        orchestrator.run(); {
-            std::unique_lock lock(sleep_mutex);
-            sleep_cv.wait_for(lock, std::chrono::seconds(5), [] {
-                return !running.load();
-            });
-        }
+    // The tray lives on this (UI) thread; the poll loop runs on the worker below.
+    auto tray = std::make_shared<Tray>("MusicPPTray");
+    {
+        std::lock_guard lock(g_tray_mutex);
+        g_tray = tray;
     }
 
+    // Callback only fires within the tray's own menu, so always alive when this runs.
+    tray->addMenuItem("Exit", [weak_tray = std::weak_ptr(tray)] {
+        logging::get("main")->info("Exit selected. Shutting down...");
+        running.store(false);
+        sleep_cv.notify_all();
+        if (const auto tray_ptr = weak_tray.lock()) {
+            tray_ptr->requestQuit();
+        }
+    });
+
+    std::jthread worker([sleep_mut = &sleep_mutex, sleep_cond = &sleep_cv, &orchestrator, tray] {
+        while (running.load()) {
+            orchestrator.run();
+            tray->setTooltip(orchestrator.nowPlaying());
+            std::unique_lock lock(*sleep_mut);
+            sleep_cond->wait_for(lock, std::chrono::seconds(5), [&] { return !running.load(); });
+        }
+    });
+
+    tray->runMessageLoop();
+
+    // Loop ended
+    {
+        std::lock_guard lock(g_tray_mutex);
+        g_tray = nullptr;
+    }
+    running.store(false);
+    sleep_cv.notify_all();
     return 0;
 }

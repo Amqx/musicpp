@@ -99,3 +99,7 @@ void Orchestrator::run() {
         _discord->setPresence(_current);
     }
 }
+
+EnrichedTrack Orchestrator::nowPlaying() const {
+    return _current;
+}

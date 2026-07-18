@@ -323,3 +323,25 @@ TEST_CASE("An orchestrator with nothing registered does not fall over", "[orches
     orchestrator.run();
     SUCCEED("A cycle with no poller is a no-op");
 }
+
+TEST_CASE("nowPlaying reports the current track", "[orchestrator]") {
+    Rig rig;
+    rig.poller->script = {makeTrack("Bohemian Rhapsody")};
+
+    SECTION("empty identity before any cycle runs") {
+        REQUIRE(rig.orchestrator.nowPlaying().track.identity.title.empty());
+    }
+
+    SECTION("reflects the playing track after a cycle") {
+        rig.cycle();
+        REQUIRE(rig.orchestrator.nowPlaying().track.identity.title == "Bohemian Rhapsody");
+        REQUIRE(rig.orchestrator.nowPlaying().track.identity.artist == "Queen");
+    }
+
+    SECTION("empty again once the player stops") {
+        rig.cycle(); // one cycle playing
+        rig.poller->script = {noPlayer()}; // player gone
+        rig.cycle();
+        REQUIRE(rig.orchestrator.nowPlaying().track.identity.title.empty());
+    }
+}
