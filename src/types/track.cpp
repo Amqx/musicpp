@@ -48,12 +48,20 @@ std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> ste
 }
 
 int64_t TrackTiming::start() const {
+    using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
+    // The unset sentinel would overflow int64 in steadyToSystem (sentinel - now); an unset
+    // endpoint reads as the unix epoch instead.
+    if (_start == SteadyPoint::min())
+        return 0;
     return std::chrono::duration_cast<std::chrono::seconds>(
         steadyToSystem(_start).time_since_epoch()
     ).count();
 }
 
 int64_t TrackTiming::end() const {
+    using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
+    if (_end == SteadyPoint::max())
+        return 0;
     return std::chrono::duration_cast<std::chrono::seconds>(
         steadyToSystem(_end).time_since_epoch()
     ).count();
@@ -65,6 +73,11 @@ void TrackTiming::set(const int64_t &start_, const int64_t &end_) {
 }
 
 std::chrono::nanoseconds TrackTiming::remaining() const {
+    using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
+    // An unset timing is {min, max}; without this guard the fall-through returns _end - now, a
+    // ~292-year span. Report it as a zero-length (not-yet-known) track, as total()/current() do.
+    if (_start == SteadyPoint::min() || _end == SteadyPoint::max())
+        return std::chrono::nanoseconds::zero();
     const auto now = std::chrono::steady_clock::now();
     if (now >= _end) {
         return std::chrono::nanoseconds::zero();

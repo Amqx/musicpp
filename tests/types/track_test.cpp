@@ -100,6 +100,46 @@ TEST_CASE("An unset timing reads as a zero-length track at its start", "[track][
     CHECK(timing.total() == 0ns);
 }
 
+TEST_CASE (
+"An unset timing has nothing remaining"
+,
+"[track][timing]"
+)
+ {
+    // The {min, max} sentinel must not leak into remaining(): max - now would be a ~292-year span.
+    const TrackTiming timing;
+
+    CHECK(timing.remaining() == 0ns);
+}
+
+TEST_CASE (
+"An unset timing's endpoints read as the epoch"
+,
+"[track][timing]"
+)
+ {
+    // start()/end() convert the steady_clock endpoints to wall time; the {min, max} sentinel must
+    // not reach that arithmetic (sentinel - now overflows int64). An unset timing reads as 0.
+    const TrackTiming timing;
+
+    CHECK(timing.start() == 0);
+    CHECK(timing.end() == 0);
+}
+
+TEST_CASE (
+"Unset timings compare equal"
+,
+"[track][timing][equality]"
+)
+ {
+    // operator== compares start()/end(); two default-constructed timings must not overflow into
+    // spuriously-unequal wall-clock values.
+    const TrackTiming left;
+    const TrackTiming right;
+
+    CHECK(left == right);
+}
+
 TEST_CASE("Identities compare by every field", "[track][equality]") {
     const auto base = makeIdentity("Bohemian Rhapsody");
 
