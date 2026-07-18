@@ -16,6 +16,7 @@
 #include "system/notifications.hpp"
 
 #include <csignal>
+#include <future>
 #include <memory>
 #include <string>
 #include <discord/rp.hpp>
@@ -169,10 +170,26 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
         }
     });
 
-    std::jthread worker([sleep_mut = &sleep_mutex, sleep_cond = &sleep_cv, &orchestrator, tray] {
+    // Released the instant the worker thread unwinds, so shutdown's grace-period wait
+    // below can proceed without joining a thread that may be parked in a blocking call.
+    std::promise<void> workerDone;
+    const std::future<void> workerFinished = workerDone.get_future();
+
+    std::jthread worker([sleep_mut = &sleep_mutex, sleep_cond = &sleep_cv, &orchestrator, tray,
+        &workerDone] {
+        // Fires however the loop exits (including an exception), so the grace-period wait
+        // is always released.
+        struct Signal {
+            std::promise<void> &done;
+            ~Signal() { done.set_value(); }
+        } signal{workerDone};
+
         EnrichedTrack curr{};
         while (running.load()) {
             orchestrator.run();
+            if (!running.load()) {
+                break; // Exit requested mid-cycle: don't start another or touch the tray.
+            }
             const EnrichedTrack playing = orchestrator.nowPlaying();
             tray->setTooltip(playing);
 
@@ -196,12 +213,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     tray->runMessageLoop();
 
-    // Loop ended
-    {
+    // The message loop has ended: signal the worker and let it wind down.
+    running.store(false);
+    sleep_cv.notify_all(); {
         std::lock_guard lock(g_tray_mutex);
         g_tray = nullptr;
     }
-    running.store(false);
-    sleep_cv.notify_all();
+
+    // Grace period before forced shutdown
+    constexpr auto kShutdownGrace = std::chrono::seconds(2);
+    if (workerFinished.wait_for(kShutdownGrace) != std::future_status::ready) {
+        const auto log = logging::get("main");
+        log->warn("Worker did not stop within {}s; forcing exit.", kShutdownGrace.count());
+        log->flush();
+        std::_Exit(0);
+    }
     return 0;
 }
