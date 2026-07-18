@@ -10,10 +10,46 @@
 
 #include <memory>
 #include <regex>
+#include <array>
 
 #include "metadata/http/curlWrapper.hpp"
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
+
+namespace {
+constexpr std::array<std::string_view, static_cast<size_t>(ScraperRegions::_COUNT)> kRegions = {
+    "ae", "ag", "ai", "am", "ar", "at", "au", "az", "bb", "be",
+    "bg", "bh", "bm", "bo", "br", "bs", "bw", "by", "bz", "ca",
+    "cf", "ch", "ci", "cl", "cm", "cn", "co", "cr", "cz", "de",
+    "dk", "dm", "do", "ec", "ee", "eg", "es", "fi", "fr", "gb",
+    "gd", "ge", "gn", "gq", "gr", "gt", "gw", "gy", "hk", "hn",
+    "hr", "hu", "id", "ie", "il", "in", "it", "jm", "jo", "jp",
+    "kg", "kn", "kr", "kw", "ky", "kz", "la", "lc", "li", "lt",
+    "lu", "lv", "ma", "md", "me", "mg", "mk", "ml", "mo", "ms",
+    "mt", "mu", "mx", "my", "mz", "ne", "ng", "ni", "nl", "no",
+    "nz", "om", "pa", "pe", "ph", "pl", "pr", "pt", "py", "qa",
+    "ro", "ru", "sa", "se", "sg", "si", "sk", "sn", "sr", "sv",
+    "tc", "th", "tj", "tm", "tn", "tr", "tt", "tw", "ua", "ug",
+    "us", "uy", "uz", "vc", "ve", "vg", "vn", "za"
+};
+}
+
+constexpr bool isValidRegion(const std::string_view &region) {
+    if (region.size() != 2)
+        return false;
+    char buf[2] = {static_cast<char>(std::tolower(static_cast<unsigned char>(region[0]))),
+                   static_cast<char>(std::tolower(static_cast<unsigned char>(region[1])))};
+    const std::string_view lower{buf, 2};
+    return std::ranges::binary_search(kRegions, lower);
+}
+
+std::string to_string(ScraperRegions region) {
+    const auto index = static_cast<size_t>(region);
+    if (index >= static_cast<size_t>(ScraperRegions::_COUNT)) {
+        throw std::out_of_range("Unknown region enum value");
+    }
+    return std::string(kRegions[index]);
+}
 
 Scraper::Scraper(const std::string &region) {
     _region = region;
