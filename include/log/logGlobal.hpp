@@ -25,7 +25,7 @@ constexpr std::array<const char *, 11> kLoggerNames = {
  * @return Path to logging dir.
  */
 inline std::filesystem::path defaultLogDir() {
-    return paths::appDataDir() / "logs";
+    return appDataDir() / "logs";
 }
 
 /**

@@ -16,7 +16,7 @@ namespace {
  * Resolves the default cache directory under LocalAppData.
  */
 std::filesystem::path defaultDbPath() {
-    return paths::appDataDir() / "song_db";
+    return appDataDir() / "song_db";
 }
 
 }
