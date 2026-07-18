@@ -17,7 +17,7 @@
 #include "system/paths.hpp"
 
 constexpr std::array<const char *, 11> kLoggerNames = {
-    "amwin", "enricher", "lastfm", "scraper", "imgur",     "discord",
+    "amwin", "enricher", "lastfm", "scraper", "imgur", "discord",
     "cache", "orchestrator", "scrobbler", "tray", "main"};
 
 /**

@@ -55,7 +55,7 @@ int64_t TrackTiming::start() const {
         return 0;
     return std::chrono::duration_cast<std::chrono::seconds>(
         steadyToSystem(_start).time_since_epoch()
-    ).count();
+        ).count();
 }
 
 int64_t TrackTiming::end() const {
@@ -64,7 +64,7 @@ int64_t TrackTiming::end() const {
         return 0;
     return std::chrono::duration_cast<std::chrono::seconds>(
         steadyToSystem(_end).time_since_epoch()
-    ).count();
+        ).count();
 }
 
 void TrackTiming::set(const int64_t &start_, const int64_t &end_) {
@@ -114,9 +114,9 @@ std::ostream &operator<<(std::ostream &os, const TrackTiming &timing) {
                            tz);
     };
     os << fmtUnix(timing.start()) << " - " << fmtUnix(timing.end()) << " | " <<
-            fmt(timing.current()) << " elapsed, "
-            << fmt(timing.remaining()) << " remaining, "
-            << fmt(timing.total()) << " total";
+        fmt(timing.current()) << " elapsed, "
+        << fmt(timing.remaining()) << " remaining, "
+        << fmt(timing.total()) << " total";
     return os;
 }
 
@@ -132,25 +132,25 @@ bool operator==(const TrackTiming &l, const TrackTiming &r) {
 
 std::ostream &operator<<(std::ostream &os, const TrackStatus &status) {
     switch (status) {
-        case Playing:
-            os << "Playing";
-            break;
-        case Paused:
-            os << "Paused";
-            break;
-        case Stopped:
-            os << "Stopped";
-            break;
-        case Unknown:
-            os << "Unknown";
-            break;
+    case Playing:
+        os << "Playing";
+        break;
+    case Paused:
+        os << "Paused";
+        break;
+    case Stopped:
+        os << "Stopped";
+        break;
+    case Unknown:
+        os << "Unknown";
+        break;
     }
     return os;
 }
 
 std::ostream &operator<<(std::ostream &os, const Track &track) {
     os << "Track { identity: " << track.identity << ", timing: " << track.timing << ", status: " <<
-            track.status << " }";
+        track.status << " }";
     return os;
 }
 

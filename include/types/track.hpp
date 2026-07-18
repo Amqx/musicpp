@@ -102,12 +102,12 @@ enum ImageType : std::uint8_t {
 
 [[nodiscard]] constexpr std::string to_string(const ImageType &type) {
     switch (type) {
-        case Static:
-            return "Static";
-        case Animated:
-            return "Animated";
-        default:
-            return "Unknown";
+    case Static:
+        return "Static";
+    case Animated:
+        return "Animated";
+    default:
+        return "Unknown";
     }
 }
 

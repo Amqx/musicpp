@@ -26,6 +26,7 @@ TEST_CASE("Small differences in spelling still match", "[matching]") {
 }
 
 TEST_CASE (
+
 "A decorated title still matches"
 ,
 "[matching]"
@@ -40,6 +41,7 @@ TEST_CASE (
 }
 
 TEST_CASE (
+
 "The substring fallback is opt-in"
 ,
 "[matching]"
@@ -54,6 +56,7 @@ TEST_CASE (
 }
 
 TEST_CASE (
+
 "A short needle does not match incidentally"
 ,
 "[matching]"

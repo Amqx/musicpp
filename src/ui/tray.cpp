@@ -18,10 +18,10 @@
 
 namespace {
 constexpr UINT kTrayCallback = WM_APP + 1; ///< Shell_NotifyIcon callback message.
-constexpr UINT kUpdateTip = WM_APP + 2;    ///< setTooltip → apply on the UI thread.
-constexpr UINT kTrayIconId = 1;            ///< Our single icon's id within the window.
-constexpr UINT kMenuIdBase = 1000;         ///< First context-menu command id.
-constexpr size_t kTipCap = 127;            ///< szTip holds 128 wchars including the null.
+constexpr UINT kUpdateTip = WM_APP + 2; ///< setTooltip → apply on the UI thread.
+constexpr UINT kTrayIconId = 1; ///< Our single icon's id within the window.
+constexpr UINT kMenuIdBase = 1000; ///< First context-menu command id.
+constexpr size_t kTipCap = 127; ///< szTip holds 128 wchars including the null.
 
 /// Widen a UTF-8 std::string to UTF-16.
 std::wstring widen(const std::string &s) {
@@ -56,12 +56,13 @@ struct Tray::Impl {
     std::wstring className;
     HWND hwnd = nullptr;
     NOTIFYICONDATAW nid{};
-    std::vector<std::pair<std::wstring, std::function<void()>>> items;
+    std::vector<std::pair<std::wstring, std::function<void()> > > items;
     std::mutex tipMutex;
     std::wstring pendingTip;
     std::shared_ptr<spdlog::logger> log = logging::get("tray");
 
     explicit Impl(std::string appName);
+
     ~Impl();
 
     static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -140,22 +141,23 @@ LRESULT CALLBACK Tray::Impl::wndProc(const HWND hwnd, const UINT msg, const WPAR
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-LRESULT Tray::Impl::handleMessage(const HWND _hwnd, const UINT msg, const WPARAM wParam, const LPARAM lParam) {
+LRESULT Tray::Impl::handleMessage(const HWND _hwnd, const UINT msg, const WPARAM wParam,
+                                  const LPARAM lParam) {
     switch (msg) {
-        case kTrayCallback:
-            if (LOWORD(lParam) == WM_RBUTTONUP || LOWORD(lParam) == WM_CONTEXTMENU) {
-                showMenu();
-            }
-            return 0;
-        case kUpdateTip:
-            applyPendingTooltip();
-            return 0;
-        case WM_DESTROY:
-            Shell_NotifyIconW(NIM_DELETE, &nid);
-            PostQuitMessage(0);
-            return 0;
-        default:
-            return DefWindowProcW(_hwnd, msg, wParam, lParam);
+    case kTrayCallback:
+        if (LOWORD(lParam) == WM_RBUTTONUP || LOWORD(lParam) == WM_CONTEXTMENU) {
+            showMenu();
+        }
+        return 0;
+    case kUpdateTip:
+        applyPendingTooltip();
+        return 0;
+    case WM_DESTROY:
+        Shell_NotifyIconW(NIM_DELETE, &nid);
+        PostQuitMessage(0);
+        return 0;
+    default:
+        return DefWindowProcW(_hwnd, msg, wParam, lParam);
     }
 }
 
@@ -173,7 +175,8 @@ void Tray::Impl::showMenu() const {
     DestroyMenu(menu);
 
     if (cmd >= static_cast<int>(kMenuIdBase)) {
-        if (const size_t idx = static_cast<size_t>(cmd) - kMenuIdBase; idx < items.size() && items[idx].second) {
+        if (const size_t idx = static_cast<size_t>(cmd) - kMenuIdBase;
+            idx < items.size() && items[idx].second) {
             items[idx].second();
         }
     }
@@ -195,8 +198,7 @@ void Tray::Impl::setTooltip(const EnrichedTrack &track) { {
 }
 
 void Tray::Impl::applyPendingTooltip() {
-    std::wstring tip;
-    {
+    std::wstring tip; {
         std::lock_guard lock(tipMutex);
         tip = pendingTip;
     }

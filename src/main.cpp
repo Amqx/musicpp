@@ -41,13 +41,12 @@ BOOL WINAPI consoleCtrlHandler(const DWORD ctrlType) {
         logging::get("main")->info("Interrupt received. Shutting down...");
         running.store(false);
         sleep_cv.notify_all();
-        std::shared_ptr<Tray> local_tray;
-        {
+        std::shared_ptr<Tray> local_tray; {
             std::lock_guard lock(g_tray_mutex);
             local_tray = g_tray;
         }
         if (local_tray) {
-            local_tray -> requestQuit();
+            local_tray->requestQuit();
         }
         return TRUE;
     }
@@ -154,8 +153,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     orchestrator.registerPoller(std::move(applemusic));
 
     // The tray lives on this (UI) thread; the poll loop runs on the worker below.
-    auto tray = std::make_shared<Tray>("MusicPPTray");
-    {
+    auto tray = std::make_shared<Tray>("MusicPPTray"); {
         std::lock_guard lock(g_tray_mutex);
         g_tray = tray;
     }

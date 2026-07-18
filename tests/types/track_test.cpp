@@ -101,6 +101,7 @@ TEST_CASE("An unset timing reads as a zero-length track at its start", "[track][
 }
 
 TEST_CASE (
+
 "An unset timing has nothing remaining"
 ,
 "[track][timing]"
@@ -113,6 +114,7 @@ TEST_CASE (
 }
 
 TEST_CASE (
+
 "An unset timing's endpoints read as the epoch"
 ,
 "[track][timing]"
@@ -127,6 +129,7 @@ TEST_CASE (
 }
 
 TEST_CASE (
+
 "Unset timings compare equal"
 ,
 "[track][timing][equality]"
