@@ -55,7 +55,7 @@ add_executable(musicpp WIN32
 target_compile_definitions(musicpp PRIVATE -D_HAS_STD_BYTE=0 -DNOMINMAX -DWIN32_LEAN_AND_MEAN -D_USE_64BIT_TIME_T)
 
 #set_target_properties(musicpp PROPERTIES LINK_FLAGS "/SUBSYSTEM:WINDOWS")
-target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} leveldb::leveldb Shell32 spdlog::spdlog LibXml2::LibXml2 PkgConfig::LIBAV)
+target_link_libraries(musicpp PRIVATE Microsoft::CppWinRT CURL::libcurl windowsapp nlohmann_json::nlohmann_json ${DISCORD_LIB_PATH} leveldb::leveldb Shell32 advapi32 spdlog::spdlog LibXml2::LibXml2 PkgConfig::LIBAV)
 target_include_directories(musicpp PRIVATE ${DISCORD_SDK_INCLUDE_DIR})
 target_compile_definitions(musicpp PRIVATE UNICODE _UNICODE)
 
@@ -85,6 +85,7 @@ add_executable(musicpp_tests
         src/orchestrator/orchestrator.cpp
         src/orchestrator/scrobble_driver.cpp
         src/orchestrator/worker.cpp
+        src/system/paths.cpp
         src/types/track.cpp
 )
 

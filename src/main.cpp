@@ -13,6 +13,7 @@
 #include "metadata/uploaders/imgur.hpp"
 #include "log/log.hpp"
 #include "orchestrator/orchestrator.hpp"
+#include "system/notifications.hpp"
 
 #include <csignal>
 #include <memory>
@@ -169,9 +170,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     });
 
     std::jthread worker([sleep_mut = &sleep_mutex, sleep_cond = &sleep_cv, &orchestrator, tray] {
+        EnrichedTrack curr{};
         while (running.load()) {
             orchestrator.run();
-            tray->setTooltip(orchestrator.nowPlaying());
+            const EnrichedTrack playing = orchestrator.nowPlaying();
+            tray->setTooltip(playing);
+
+            // make sure toasts work
+            if (curr != playing) {
+                curr = playing;
+                if (const auto &id = curr.track.identity; id.title.empty()) {
+                    showToastNotification("MusicPP", "Nothing playing");
+                } else {
+                    showToastNotification("Now playing",
+                                          id.artist.empty()
+                                              ? id.title
+                                              : id.title + " — " + id.artist);
+                }
+            }
+
             std::unique_lock lock(*sleep_mut);
             sleep_cond->wait_for(lock, std::chrono::seconds(5), [&] { return !running.load(); });
         }

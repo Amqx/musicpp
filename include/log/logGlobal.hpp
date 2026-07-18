@@ -16,9 +16,10 @@
 #include <vector>
 #include "system/paths.hpp"
 
-constexpr std::array<const char *, 11> kLoggerNames = {
+constexpr std::array<const char *, 12> kLoggerNames = {
     "amwin", "enricher", "lastfm", "scraper", "imgur", "discord",
-    "cache", "orchestrator", "scrobbler", "tray", "main"};
+    "cache", "orchestrator", "scrobbler", "tray", "main", "notifications"
+};
 
 /**
  * Finds %appdata%/musicppv2/logs.
