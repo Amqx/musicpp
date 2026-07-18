@@ -18,11 +18,11 @@ public:
     std::string album;
 
     TrackIdentity();
+
+    friend auto operator<=>(const TrackIdentity &, const TrackIdentity &) = default;
 };
 
 std::ostream &operator<<(std::ostream &os, const TrackIdentity &track);
-
-[[nodiscard]] bool operator==(const TrackIdentity &l, const TrackIdentity &r);
 
 class TrackTiming {
 public:
@@ -111,18 +111,28 @@ enum ImageType : std::uint8_t {
     }
 }
 
+std::ostream &operator<<(std::ostream &os, const ImageType &type);
+
 class ImageUrl {
 public:
     std::string url;
     ImageType type = Static;
     std::string source;
+
+    friend auto operator<=>(const ImageUrl &, const ImageUrl &) = default;
 };
+
+std::ostream &operator<<(std::ostream &os, const ImageUrl &image);
 
 class SongUrl {
 public:
     std::string url;
     std::string source;
+
+    friend auto operator<=>(const SongUrl &, const SongUrl &) = default;
 };
+
+std::ostream &operator<<(std::ostream &os, const SongUrl &song);
 
 class PauseDetails {
 public:
@@ -130,7 +140,11 @@ public:
      * Time the current pause began, in seconds since the unix epoch. Empty while not paused.
      */
     std::optional<int64_t> since;
+
+    friend auto operator<=>(const PauseDetails &, const PauseDetails &) = default;
 };
+
+std::ostream &operator<<(std::ostream &os, const PauseDetails &pause);
 
 class EnrichedTrack {
 public:
@@ -138,4 +152,8 @@ public:
     ImageUrl image;
     std::vector<SongUrl> songUrls;
     PauseDetails pause;
+
+    friend bool operator==(const EnrichedTrack &, const EnrichedTrack &) = default;
 };
+
+std::ostream &operator<<(std::ostream &os, const EnrichedTrack &track);

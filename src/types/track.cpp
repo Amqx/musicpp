@@ -12,10 +12,6 @@ std::ostream &operator<<(std::ostream &os, const TrackIdentity &track) {
     return os;
 }
 
-bool operator==(const TrackIdentity &l, const TrackIdentity &r) {
-    return l.title == r.title && l.artist == r.artist && l.album == r.album;
-}
-
 std::chrono::nanoseconds TrackTiming::current() const {
     using SteadyPoint = std::chrono::time_point<std::chrono::steady_clock>;
     const auto now = std::chrono::steady_clock::now();
@@ -156,4 +152,41 @@ std::ostream &operator<<(std::ostream &os, const Track &track) {
 
 bool operator==(const Track &l, const Track &r) {
     return l.identity == r.identity && l.timing == r.timing && l.status == r.status;
+}
+
+std::ostream &operator<<(std::ostream &os, const ImageType &type) {
+    os << to_string(type);
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const ImageUrl &image) {
+    os << "ImageUrl { url: " << image.url << ", type: " << image.type << ", source: "
+        << image.source << " }";
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const SongUrl &song) {
+    os << "SongUrl { url: " << song.url << ", source: " << song.source << " }";
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const PauseDetails &pause) {
+    os << "PauseDetails { since: ";
+    if (pause.since)
+        os << *pause.since;
+    else
+        os << "none";
+    os << " }";
+    return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const EnrichedTrack &track) {
+    os << "EnrichedTrack { track: " << track.track << ", image: " << track.image << ", songUrls: [";
+    for (size_t i = 0; i < track.songUrls.size(); ++i) {
+        os << track.songUrls[i];
+        if (i + 1 < track.songUrls.size())
+            os << ", ";
+    }
+    os << "], pause: " << track.pause << " }";
+    return os;
 }
